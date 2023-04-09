@@ -56,8 +56,33 @@ pub mod tui_handler {
                     .as_ref()
                     )
                     .split(size);
+                
+                let header = 
+                    widgets::Paragraph::new("Nik's TODO List")
+                    .style(style::Style::default().fg(style::Color::LightCyan))
+                    .alignment(layout::Alignment::Center)
+                    .block(
+                        widgets::Block::default()
+                        .borders(widgets::Borders::ALL)
+                        .style(style::Style::default().fg(style::Color::White))
+                        .border_type(widgets::BorderType::Plain)
+                        );
 
-                let footer_copyright_temp = 
+
+                let content = 
+                    widgets::Paragraph::new("Todo:".to_owned()
+                                            + "\nMake Minecraft      []"
+                                            + "\nCelebrate Easter    []")
+                    .style(style::Style::default().fg(style::Color::LightCyan))
+                    .alignment(layout::Alignment::Center)
+                    .block(
+                        widgets::Block::default()
+                        .borders(widgets::Borders::ALL)
+                        .style(style::Style::default().fg(style::Color::White))
+                        .border_type(widgets::BorderType::Plain)
+                        );
+
+               let footer_copyright_temp = 
                     widgets::Paragraph::new("Temp Copyright - Copyright Niklas Harnish")
                     .style(style::Style::default().fg(style::Color::LightCyan))
                     .alignment(layout::Alignment::Center)
@@ -68,7 +93,9 @@ pub mod tui_handler {
                         .title("Copyright")
                         .border_type(widgets::BorderType::Plain)
                     );
-
+                
+                rec.render_widget(header, chunks[0]);
+                rec.render_widget(content, chunks[1]); 
                 rec.render_widget(footer_copyright_temp, chunks[2]);
             }).expect("Drawing TUI");
         }
