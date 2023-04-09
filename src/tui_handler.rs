@@ -1,4 +1,4 @@
-#[allow(dead_code)]
+#[allow(dead_code)]     //TODO: remove
 pub mod tui_handler {
     use crossterm::terminal::enable_raw_mode;
     use crossterm::event as CEvent;
@@ -27,12 +27,12 @@ pub mod tui_handler {
 
     pub fn run_tui() -> Result<(), String> {
         enable_raw_mode().expect("Raw Mode");
-        let (sx, rx) = channel();
+        let (sx, _rx) = channel();
          
         thread::spawn(move || {
-            input_handler(&sx);
+            input_handler(&sx).expect("Input handler crashed");
         });
-        tui_handler();
+        tui_handler().expect("TUI handler crashed");
         
         return Err("Something went wrong".to_owned());
     }
