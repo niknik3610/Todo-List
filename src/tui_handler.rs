@@ -1,15 +1,15 @@
-use std::io::Stdout;
-
-use tui::{backend::CrosstermBackend, Terminal, layout, widgets, style};
-
 #[allow(dead_code)]     //TODO: remove
 pub mod tui_handler {
-    use crossterm::terminal::enable_raw_mode;
+    use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
     use crossterm::event as CEvent;
     use tui::{backend::CrosstermBackend, layout};
     use tui::{Terminal, widgets, style};
     use std::io::Stdout;
-    use std::{sync::mpsc::channel, sync::mpsc::{Sender, Receiver}, time::{Duration, Instant}, thread, io};
+    use std::sync::{Arc, Mutex};
+    use std::{
+        sync::mpsc::channel,
+        sync::mpsc::{Sender, Receiver},
+        time::{Duration, Instant}, thread, io};
     use std::convert::From;
 
 
@@ -27,12 +27,14 @@ pub mod tui_handler {
 
     enum State {
         Viewing,
-        DebugPrinting
+        DebugPrinting,
+        Quitting,
     }
 
     enum UserAction<'a> {
         View,
-        DebugMsg(&'a str)
+        DebugMsg(&'a str),
+        Quit,
     }
 
     impl From<MenuItem> for usize {
@@ -44,22 +46,34 @@ pub mod tui_handler {
     }
 
     pub fn run_tui() -> Result<(), String> {
+        let current_state = Arc::new(Mutex::new(State::Viewing));
+        let current_state_input = current_state.clone();
+
         enable_raw_mode().expect("Raw Mode");
         let (sx, rx) = channel();
-        
-        thread::spawn(move || {
+        let mut threads = Vec::new(); 
+        threads.push(thread::spawn(move|| {
             let mut current_tick_time = Instant::now();
             loop {
+                {
+                    let current_state_data = current_state_input.lock().unwrap();
+                    if let State::Quitting = *current_state_data  {
+                        break;
+                    }
+                }
                 capture_input(&sx, &mut current_tick_time).expect("Input handler crashed");     
             }
-        });
-        tui_handler(&rx).expect("TUI handler crashed");
+        }));
 
-        return Err("Something went wrong".to_owned());
+        tui_handler(&rx, current_state).expect("TUI handler crashed");
+        
+        threads
+            .into_iter()
+            .for_each(|thread| thread.join().unwrap());
+        return Ok(());
     }
 
-    fn tui_handler(rx: &Receiver<Event<CEvent::KeyEvent>>)-> Result <(), Box<dyn std::error::Error>> {
-        let mut current_state = State::Viewing;
+    fn tui_handler(rx: &Receiver<Event<CEvent::KeyEvent>>, current_state: Arc<Mutex<State>>)-> Result <(), Box<dyn std::error::Error>> {
         let mut output_buffer: String = String::from("Buffer was never initilized");
 
         let stdout = io::stdout();
@@ -67,31 +81,37 @@ pub mod tui_handler {
         let mut terminal = Terminal::new(backend)?; 
         let mut delta_time = Instant::now();
 
+
         loop {
             let input_result = match rx.recv().unwrap() {
                 Event::Input(input) => handle_input(input),
                 Event::Tick => continue
             };
-
+            
+            let mut current_state_data = current_state.lock().unwrap();
             match input_result {
                 Some(result) => { 
                     match result {
-                        UserAction::View => current_state = State::Viewing,
+                       UserAction::View => *current_state_data = State::Viewing,
                         UserAction::DebugMsg(msg) => {
-                            current_state = State::DebugPrinting;
+                            *current_state_data = State::DebugPrinting;
                             output_buffer = msg.to_string();
                         }
+                        UserAction::Quit => *current_state_data = State::Quitting
                     }
                 }
                 None => {}
             }
-
-
+            
             if Instant::now().duration_since(delta_time) > Duration::from_millis(1000 / FRAME_RATE as u64) {
                 delta_time = Instant::now();
-                match current_state {
+                match *current_state_data {
                     State::Viewing => render_viewing(&mut terminal)?,
-                    State::DebugPrinting => render_debugging(&mut terminal, &output_buffer)?
+                    State::DebugPrinting => render_debugging(&mut terminal, &output_buffer)?,
+                    State::Quitting => {
+                        disable_raw_mode().unwrap();
+                        return Ok(());
+                   }
                 }
 
                 thread::sleep(Duration::from_millis(1000/(FRAME_RATE * 2) as u64))
@@ -129,6 +149,7 @@ pub mod tui_handler {
 
         match key {
             'a' => Some(UserAction::DebugMsg("Hello World!")),
+            'q' => Some(UserAction::Quit),
             _ => None 
         }
     }
@@ -148,8 +169,9 @@ pub mod tui_handler {
                 )
                 .split(size);                   
 
+            let msg = format!("Nik's Editor");
             let header =
-                widgets::Paragraph::new("Nik's TODO List")
+                widgets::Paragraph::new(&msg[..])
                 .style(style::Style::default().fg(style::Color::LightCyan))
                 .alignment(layout::Alignment::Center)
                 .block(
