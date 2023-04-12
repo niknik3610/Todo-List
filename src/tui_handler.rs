@@ -1,17 +1,17 @@
 #[allow(dead_code)]     //TODO: remove
+mod todo_renderers;
 pub mod tui_handler {
+    use crate::tui_handler::todo_renderers::*;
     use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
     use crossterm::event as CEvent;
-    use tui::{backend::CrosstermBackend, layout};
-    use tui::{Terminal, widgets, style};
-    use std::io::Stdout;
+    use tui::backend::CrosstermBackend;
+    use tui::Terminal;
     use std::sync::{Arc, Mutex};
     use std::{
         sync::mpsc::channel,
         sync::mpsc::{Sender, Receiver},
         time::{Duration, Instant}, thread, io};
     use std::convert::From;
-
 
     const TICK_RATE: Duration = Duration::from_millis(200);
     const FRAME_RATE: u8 = 30;
@@ -21,28 +21,19 @@ pub mod tui_handler {
         Tick
     }
 
-    enum MenuItem {
-        Home
-    }
-
     enum State {
         Viewing,
         DebugPrinting,
         Quitting,
+        Adding,
     }
 
     enum UserAction<'a> {
         View,
         DebugMsg(&'a str),
         Quit,
-    }
-
-    impl From<MenuItem> for usize {
-        fn from(input: MenuItem) -> usize {
-            match input {
-                MenuItem::Home => 0
-            }
-        }
+        Add,
+        Input(char),
     }
 
     pub fn run_tui() -> Result<(), String> {
@@ -74,7 +65,7 @@ pub mod tui_handler {
     }
 
     fn tui_handler(rx: &Receiver<Event<CEvent::KeyEvent>>, current_state: Arc<Mutex<State>>)-> Result <(), Box<dyn std::error::Error>> {
-        let mut output_buffer: String = String::from("Buffer was never initilized");
+        let mut output_buffer = String::from("");
 
         let stdout = io::stdout();
         let backend = CrosstermBackend::new(stdout);
@@ -84,7 +75,7 @@ pub mod tui_handler {
 
         loop {
             let input_result = match rx.recv().unwrap() {
-                Event::Input(input) => handle_input(input),
+                Event::Input(input) => handle_input(input, &current_state),
                 Event::Tick => continue
             };
             
@@ -92,12 +83,17 @@ pub mod tui_handler {
             match input_result {
                 Some(result) => { 
                     match result {
-                       UserAction::View => *current_state_data = State::Viewing,
+                        UserAction::View => {
+                            *current_state_data = State::Viewing;
+                            output_buffer = String::from("");
+                        },
                         UserAction::DebugMsg(msg) => {
                             *current_state_data = State::DebugPrinting;
                             output_buffer = msg.to_string();
                         }
-                        UserAction::Quit => *current_state_data = State::Quitting
+                        UserAction::Quit => *current_state_data = State::Quitting,
+                        UserAction::Add => *current_state_data = State::Adding, 
+                        UserAction::Input(input) => output_buffer.push(input),
                     }
                 }
                 None => {}
@@ -108,6 +104,7 @@ pub mod tui_handler {
                 match *current_state_data {
                     State::Viewing => render_viewing(&mut terminal)?,
                     State::DebugPrinting => render_debugging(&mut terminal, &output_buffer)?,
+                    State::Adding => render_adding(&mut terminal, &output_buffer)?,
                     State::Quitting => {
                         disable_raw_mode().unwrap();
                         return Ok(());
@@ -140,150 +137,24 @@ pub mod tui_handler {
         Ok(()) 
     }
 
-    fn handle_input<'a>(input: CEvent::KeyEvent) -> Option<UserAction<'a>> { 
+    fn handle_input<'a>(input: CEvent::KeyEvent, current_state: &Arc<Mutex<State>>) -> Option<UserAction<'a>> { 
         use crossterm::event::KeyCode;
         let key = match input.code {
             KeyCode::Char(input) => input,  
+            KeyCode::Esc => return Some(UserAction::View),
             _ => return None
         };
+        
+        let current_state_data = current_state.lock().unwrap();
+        if let State::Adding = *current_state_data{
+            return Some(UserAction::Input(key))
+        }
 
         match key {
-            'a' => Some(UserAction::DebugMsg("Hello World!")),
+            'd' => Some(UserAction::DebugMsg("Hello World!")),
             'q' => Some(UserAction::Quit),
+            'n' => Some(UserAction::Add),
             _ => None 
         }
-    }
-
-    fn render_viewing(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<(), Box<dyn std::error::Error>> {
-        terminal.draw(|rec| {
-            let size = rec.size();
-            let chunks = layout::Layout::default()
-                .direction(layout::Direction::Vertical)
-                .margin(2)
-                .constraints([
-                             layout::Constraint::Length(3),  //Menu Bar
-                             layout::Constraint::Min(2),     //Content
-                             layout::Constraint::Length(3)   //Footer
-                ]
-                .as_ref()
-                )
-                .split(size);                   
-
-            let msg = format!("Nik's Editor");
-            let header =
-                widgets::Paragraph::new(&msg[..])
-                .style(style::Style::default().fg(style::Color::LightCyan))
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(style::Style::default().fg(style::Color::White))
-                    .border_type(widgets::BorderType::Plain)
-                    );
-
-
-            let content = 
-                widgets::Paragraph::new("Todo:".to_owned()
-                                        + "\nMake Minecraft      []"
-                                        + "\nCelebrate Easter    []")
-                .style(style::Style::default().fg(style::Color::LightCyan))
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(style::Style::default().fg(style::Color::White))
-                    .border_type(widgets::BorderType::Plain)
-                    );
-
-            let footer_copyright_temp = 
-                widgets::Paragraph::new("Temp Copyright - Copyright Niklas Harnish")
-                .style(style::Style::default().fg(style::Color::LightCyan))
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(style::Style::default().fg(style::Color::White))
-                    .title("Copyright")
-                    .border_type(widgets::BorderType::Plain)
-                    );
-
-            rec.render_widget(header, chunks[0]);
-            rec.render_widget(content, chunks[1]); 
-            rec.render_widget(footer_copyright_temp, chunks[2]);
-        }).expect("Drawing TUI");
-        Ok(()) 
-    }
-
-    fn render_debugging(terminal: &mut Terminal<CrosstermBackend<Stdout>>, output_buffer: &String) -> Result<(), Box<dyn std::error::Error>> {
-        terminal.draw(|rec| {
-            let size = rec.size();
-            let chunks = layout::Layout::default()
-                .direction(layout::Direction::Vertical)
-                .margin(2)
-                .constraints([
-                             layout::Constraint::Length(5),     //Debug
-                             layout::Constraint::Length(3),     //Menu Bar
-                             layout::Constraint::Min(2),        //Content
-                             layout::Constraint::Length(3)      //Footer
-                ]
-                .as_ref()
-                )
-                .split(size);                   
-
-            let debug =
-                widgets::Paragraph::new(&output_buffer[..])
-                .style(style::Style::default().fg(style::Color::LightCyan))
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(style::Style::default().fg(style::Color::White))
-                    .border_type(widgets::BorderType::Plain)
-                    );
-
-
-            let header =
-                widgets::Paragraph::new("Nik's TODO List")
-                .style(style::Style::default().fg(style::Color::LightCyan))
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(style::Style::default().fg(style::Color::White))
-                    .border_type(widgets::BorderType::Plain)
-                    );
-
-
-            let content = 
-                widgets::Paragraph::new("Todo:".to_owned()
-                                        + "\nMake Minecraft      []"
-                                        + "\nCelebrate Easter    []")
-                .style(style::Style::default().fg(style::Color::LightCyan))
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(style::Style::default().fg(style::Color::White))
-                    .border_type(widgets::BorderType::Plain)
-                    );
-
-            let footer_copyright_temp = 
-                widgets::Paragraph::new("Temp Copyright - Copyright Niklas Harnish")
-                .style(style::Style::default().fg(style::Color::LightCyan))
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(style::Style::default().fg(style::Color::White))
-                    .title("Copyright")
-                    .border_type(widgets::BorderType::Plain)
-                    );
-
-            rec.render_widget(debug, chunks[0]);
-            rec.render_widget(header, chunks[1]);
-            rec.render_widget(content, chunks[2]); 
-            rec.render_widget(footer_copyright_temp, chunks[3]);
-        }).expect("Drawing TUI");
-        Ok(()) 
     }
 }
