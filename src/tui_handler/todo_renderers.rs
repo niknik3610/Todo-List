@@ -8,7 +8,9 @@ use tui::{
     style::{Style, Color}
 };
 
-pub fn render_viewing(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<(), Box<dyn std::error::Error>> {
+use crate::todo_backend::todo::TodoList;
+
+pub fn render_viewing(terminal: &mut Terminal<CrosstermBackend<Stdout>>, todo: &String) -> Result<(), Box<dyn std::error::Error>> {
     terminal.draw(|rec| {
         let size = rec.size();
         let chunks = layout::Layout::default()
@@ -20,12 +22,12 @@ pub fn render_viewing(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Resu
                          layout::Constraint::Length(3)   //Footer
             ]
             .as_ref()
-            )
+            ) 
             .split(size);                   
 
-        let msg = format!("Nik's Editor");
+        
         let header =
-            widgets::Paragraph::new(&msg[..])
+            widgets::Paragraph::new("Nik's TodoList")
             .style(Style::default().fg(Color::LightCyan))
             .alignment(layout::Alignment::Center)
             .block(
@@ -35,11 +37,8 @@ pub fn render_viewing(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Resu
                 .border_type(widgets::BorderType::Plain)
                 );
 
-
         let content = 
-            widgets::Paragraph::new("Todo:".to_owned()
-                                    + "\nMake Minecraft      []"
-                                    + "\nCelebrate Easter    []")
+            widgets::Paragraph::new(todo.clone())
             .style(Style::default().fg(Color::LightCyan))
             .alignment(layout::Alignment::Center)
             .block(
@@ -68,7 +67,7 @@ pub fn render_viewing(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Resu
     Ok(()) 
 }
 
-pub fn render_debugging(terminal: &mut Terminal<CrosstermBackend<Stdout>>, output_buffer: &String) -> Result<(), Box<dyn std::error::Error>> {
+pub fn render_debugging(terminal: &mut Terminal<CrosstermBackend<Stdout>>, output_buffer: &String, todo: &String) -> Result<(), Box<dyn std::error::Error>> {
     terminal.draw(|rec| {
         let size = rec.size();
         let chunks = layout::Layout::default()
@@ -109,9 +108,7 @@ pub fn render_debugging(terminal: &mut Terminal<CrosstermBackend<Stdout>>, outpu
 
 
         let content = 
-            widgets::Paragraph::new("Todo:".to_owned()
-                                    + "\nMake Minecraft      []"
-                                    + "\nCelebrate Easter    []")
+            widgets::Paragraph::new(todo.clone())
             .style(Style::default().fg(Color::LightCyan))
             .alignment(layout::Alignment::Center)
             .block(
@@ -141,7 +138,7 @@ pub fn render_debugging(terminal: &mut Terminal<CrosstermBackend<Stdout>>, outpu
     Ok(()) 
 }
 
-pub fn render_adding(terminal: &mut Terminal<CrosstermBackend<Stdout>>, output_buffer: &String) -> Result<(), Box<dyn std::error::Error>> {
+pub fn render_adding(terminal: &mut Terminal<CrosstermBackend<Stdout>>, output_buffer: &String, todo: &String) -> Result<(), Box<dyn std::error::Error>> {
     terminal.draw(|rec| {
         let size = rec.size();
         let chunks = layout::Layout::default()
@@ -168,9 +165,7 @@ pub fn render_adding(terminal: &mut Terminal<CrosstermBackend<Stdout>>, output_b
                 );
 
         let content = 
-            widgets::Paragraph::new("Todo:".to_owned()
-                                    + "\nMake Minecraft      []"
-                                    + "\nCelebrate Easter    []")
+            widgets::Paragraph::new(todo.clone())
             .style(Style::default().fg(Color::LightCyan))
             .alignment(layout::Alignment::Center)
             .block(

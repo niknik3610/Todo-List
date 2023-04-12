@@ -2,7 +2,7 @@ pub mod todo{
     use std::collections::HashMap;
     pub struct TodoList {
         next_id: usize,
-        items: HashMap<usize, TodoItem>,
+        pub items: HashMap<usize, TodoItem>,
     } impl TodoList {
         pub fn new() -> TodoList {
             TodoList {
@@ -40,9 +40,9 @@ pub mod todo{
         }
     }
 
-    struct TodoItem {
-        title: String,
-        completed: bool,
+    pub struct TodoItem {
+        pub title: String,
+        pub completed: bool,
     } impl TodoItem {
         fn new(item_title: String) -> TodoItem {
             TodoItem {
