@@ -27,15 +27,13 @@ pub mod tui_handler {
 
     enum State {
         Viewing,
-        DebugPrinting,
         Quitting,
         AddingTodo,
         CompletingTodo,
     }
 
-    enum UserAction<'a> {
+    enum UserAction {
         View,
-        DebugMsg(&'a str),
         Quit,
         AddTodo,
         CompeleteTodo,
@@ -116,12 +114,7 @@ pub mod tui_handler {
                             *current_state_data = State::Viewing;
                             todo_items = generate_todo(todo);
                             output_buffer = String::from("");
-                        },
-
-                        UserAction::DebugMsg(msg) => {
-                            *current_state_data = State::DebugPrinting;
-                            output_buffer = msg.to_string();
-                        }
+                        }, 
                         UserAction::Quit => *current_state_data = State::Quitting,
                         UserAction::AddTodo => *current_state_data = State::AddingTodo, 
                         UserAction::CompeleteTodo => *current_state_data = State::CompletingTodo,
@@ -134,10 +127,12 @@ pub mod tui_handler {
             {
                 let current_state_data = current_state.lock().unwrap();
                 match *current_state_data {
-                    State::Viewing => render_viewing(&mut terminal, &todo_items)?,
-                    State::DebugPrinting => render_debugging(&mut terminal, &output_buffer, &todo_items)?,
-                    State::AddingTodo => render_adding(&mut terminal, &output_buffer, &todo_items)?,
-                    State::CompletingTodo => render_completing(&mut terminal, &output_buffer, &todo_items)?,
+                    State::Viewing => 
+                        render_viewing(&mut terminal, &todo_items)?,
+                    State::AddingTodo => 
+                        render_with_buffer(&mut terminal, &output_buffer, &todo_items, "Adding: ")?,
+                    State::CompletingTodo => 
+                        render_with_buffer(&mut terminal, &output_buffer, &todo_items, "Completing: ")?,
                     State::Quitting => {
                         disable_raw_mode().unwrap();
                         return Ok(());
@@ -169,7 +164,7 @@ pub mod tui_handler {
         Ok(()) 
     }
 
-    fn handle_input<'a>(input: CEvent::KeyEvent, current_state: &Arc<Mutex<State>>) -> Option<UserAction<'a>> { 
+    fn handle_input<'a>(input: CEvent::KeyEvent, current_state: &Arc<Mutex<State>>) -> Option<UserAction> { 
         use crossterm::event::KeyCode;
         let current_state_data = current_state.lock().unwrap();
         
@@ -181,7 +176,6 @@ pub mod tui_handler {
             };
 
             return match key {
-                'd' => Some(UserAction::DebugMsg("Hello World!")),
                 'q' => Some(UserAction::Quit),
                 'n' => Some(UserAction::AddTodo),
                 'c' => Some(UserAction::CompeleteTodo),
