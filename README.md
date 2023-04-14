@@ -16,7 +16,8 @@ There are two modes currently: Insert and Viewing mode. Within insert and comple
 
 - q: Quits the app and returns your terminal to the normal mode
 - n: Insert a new entry into your todo-list, by entering it's name into the buffer
-- c: Enter the id into the buffer, of the todo-item to complete the item
+- c: Completes a Todo item, enter the id into the buffer of the item that you want to complete
+- u: Uncompletes a Todo item, enter the id into the buffer of the item that you want to uncomplete
 
 ## Dependencies
 Tui-rs: https://crates.io/crates/serde \
