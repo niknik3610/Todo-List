@@ -30,6 +30,7 @@ pub mod tui_handler {
         Quitting,
         AddingTodo,
         CompletingTodo,
+        UncompletingTodo,
     }
 
     enum UserAction {
@@ -37,8 +38,11 @@ pub mod tui_handler {
         Quit,
         AddTodo,
         CompeleteTodo,
+        UncompleteTodo,
+        //input Actions
         SubmitBuffer,
         Input(char),
+        Backspace,
     }
 
     pub fn run_tui(todo_list: &mut TodoList) -> Result<(), String> {
@@ -53,6 +57,7 @@ pub mod tui_handler {
             let mut current_tick_time = Instant::now();
             loop {
                 {
+                    //if panic I don't know how to recover
                     let current_state_data = current_state_input.lock().unwrap();
                     if let State::Quitting = *current_state_data  {
                         break;
@@ -70,7 +75,12 @@ pub mod tui_handler {
         return Ok(());
     }
 
-    fn tui_handler(rx: &Receiver<Event<CEvent::KeyEvent>>, current_state: Arc<Mutex<State>>, todo: &mut TodoList)-> Result <(), Box<dyn std::error::Error>> {
+    fn tui_handler(
+        rx: &Receiver<Event<CEvent::KeyEvent>>, 
+        current_state: Arc<Mutex<State>>,
+        todo: &mut TodoList
+        )-> Result <(), Box<dyn std::error::Error>> {
+
         let mut output_buffer = String::from("");
         let mut todo_items = generate_todo(todo);
 
@@ -109,16 +119,26 @@ pub mod tui_handler {
                                         .parse::<usize>()
                                         .unwrap()).unwrap();
                                 }
+                                State::UncompletingTodo => {
+                                    todo.uncomplete_item(
+                                        output_buffer
+                                        .parse::<usize>()
+                                        .unwrap()).unwrap();
+                                }
                                 _ => {}
                             }
                             *current_state_data = State::Viewing;
                             todo_items = generate_todo(todo);
                             output_buffer = String::from("");
                         }, 
+                        UserAction::Input(input) => output_buffer.push(input),
+                        UserAction::Backspace => {output_buffer.pop();},
+                        //just change the state depending on user action
                         UserAction::Quit => *current_state_data = State::Quitting,
                         UserAction::AddTodo => *current_state_data = State::AddingTodo, 
                         UserAction::CompeleteTodo => *current_state_data = State::CompletingTodo,
-                        UserAction::Input(input) => output_buffer.push(input),
+                        UserAction::UncompleteTodo => *current_state_data = State::UncompletingTodo,
+
                     }
                 } 
             }
@@ -133,6 +153,8 @@ pub mod tui_handler {
                         render_with_buffer(&mut terminal, &output_buffer, &todo_items, "Adding: ")?,
                     State::CompletingTodo => 
                         render_with_buffer(&mut terminal, &output_buffer, &todo_items, "Completing: ")?,
+                    State::UncompletingTodo =>
+                        render_with_buffer(&mut terminal, &output_buffer, &todo_items, "Unclompleting: ")?, 
                     State::Quitting => {
                         disable_raw_mode().unwrap();
                         return Ok(());
@@ -143,7 +165,11 @@ pub mod tui_handler {
         
     }
 
-    fn capture_input(sx: &Sender<Event<CEvent::KeyEvent>>, current_tick_time: &mut Instant) -> Result<(), Box<dyn std::error::Error>> {
+    fn capture_input(
+        sx: &Sender<Event<CEvent::KeyEvent>>, 
+        current_tick_time: &mut Instant
+        ) -> Result<(), Box<dyn std::error::Error>> {
+       
         let event_timer = TICK_RATE
             .checked_sub(current_tick_time.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
@@ -164,7 +190,9 @@ pub mod tui_handler {
         Ok(()) 
     }
 
-    fn handle_input<'a>(input: CEvent::KeyEvent, current_state: &Arc<Mutex<State>>) -> Option<UserAction> { 
+    fn handle_input<'a>(
+        input: CEvent::KeyEvent,
+        current_state: &Arc<Mutex<State>>) -> Option<UserAction> { 
         use crossterm::event::KeyCode;
         let current_state_data = current_state.lock().unwrap();
         
@@ -179,6 +207,7 @@ pub mod tui_handler {
                 'q' => Some(UserAction::Quit),
                 'n' => Some(UserAction::AddTodo),
                 'c' => Some(UserAction::CompeleteTodo),
+                'u' => Some(UserAction::UncompleteTodo),
                 _ => None 
             };    
         }
@@ -186,6 +215,7 @@ pub mod tui_handler {
         //handles user actions when in buffer mode
         match input.code {
             KeyCode::Char(input) => return Some(UserAction::Input(input)),
+            KeyCode::Backspace => return Some(UserAction::Backspace),
             KeyCode::Enter => return Some(UserAction::SubmitBuffer), 
             KeyCode::Esc => return Some(UserAction::View),
             _ => return None
@@ -193,8 +223,8 @@ pub mod tui_handler {
     }
 
     fn generate_todo(todo: &TodoList) -> String {
-        let mut todo_str = String::new();
-        todo.items
+        let mut todo_str = String::from("Todo:\n");
+        todo.todo_items
             .iter()
             .enumerate()
             .for_each(|(index, item)| { 
@@ -204,6 +234,19 @@ pub mod tui_handler {
                         completed = if !item.completed {COMPLETED_ITEM[0]} else {COMPLETED_ITEM[1]}
                         )); 
         });
+        
+        todo_str.push_str("\n\nCompleted Todos:\n");
+        todo.completed_items
+            .iter()
+            .enumerate()
+            .for_each(|(index, item)| { 
+                todo_str.push_str(&format!(
+                        "{index} - {item_name} [{completed}]\n", 
+                        item_name = item.title, 
+                        completed = if !item.completed {COMPLETED_ITEM[0]} else {COMPLETED_ITEM[1]}
+                        )); 
+        });
+            
         
         return todo_str;
     }

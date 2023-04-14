@@ -8,9 +8,11 @@ use tui::{
     style::{Style, Color}
 };
 
-use crate::todo_backend::todo::TodoList;
+pub fn render_viewing(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>, 
+    todo: &String
+    ) -> Result<(), Box<dyn std::error::Error>> {
 
-pub fn render_viewing(terminal: &mut Terminal<CrosstermBackend<Stdout>>, todo: &String) -> Result<(), Box<dyn std::error::Error>> {
     terminal.draw(|rec| {
         let size = rec.size();
         let chunks = layout::Layout::default()
@@ -72,9 +74,9 @@ pub fn render_with_buffer(
     output_buffer: &String,
     todo: &String,
     buffer_text: &str
-    ) 
-    -> Result<(), Box<dyn std::error::Error>> { 
-        terminal.draw(|rec| {
+    ) -> Result<(), Box<dyn std::error::Error>> { 
+
+    terminal.draw(|rec| {
         let size = rec.size();
         let chunks = layout::Layout::default()
             .direction(layout::Direction::Vertical)
