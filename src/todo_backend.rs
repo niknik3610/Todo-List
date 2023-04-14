@@ -1,11 +1,16 @@
 pub mod todo{
     use std::vec::Vec;
+    use serde::{
+        Serialize,
+        Deserialize
+    };
     
     #[derive(Debug)]
     pub enum TodoError {
         TodoOutOfBoundsError,
     }
-
+    
+    #[derive(Serialize, Deserialize)]
     pub struct TodoList {
         pub todo_items: Vec<TodoItem>,
         pub completed_items: Vec<TodoItem>,
@@ -56,6 +61,7 @@ pub mod todo{
         }
     }
 
+    #[derive(Serialize, Deserialize)]
     pub struct TodoItem {
         pub title: String,
         pub completed: bool,

@@ -10,4 +10,5 @@ fn main() {
     list.complete_item(0).unwrap();
 
     tui_handler::tui_handler::run_tui(&mut list).unwrap();
+    data_handler::data_handler::save_todo_list(&list);
 }
