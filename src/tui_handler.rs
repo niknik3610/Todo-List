@@ -17,7 +17,6 @@ pub mod tui_handler {
     use std::convert::From;
 
     const TICK_RATE: Duration = Duration::from_millis(200);
-    const FRAME_RATE: u8 = 30;
 
     enum Event<T> {
         Input(T),
