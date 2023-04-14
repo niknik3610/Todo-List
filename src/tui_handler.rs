@@ -3,7 +3,6 @@ mod todo_renderers;
 pub mod tui_handler {
     use crate::todo_backend::todo::TodoList;
     use crate::tui_handler::todo_renderers::*;
-    use crate::todo_backend::*;
     use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
     use crossterm::event as CEvent;
     use tui::backend::CrosstermBackend;
@@ -12,11 +11,14 @@ pub mod tui_handler {
     use std::{
         sync::mpsc::channel,
         sync::mpsc::{Sender, Receiver},
-        time::{Duration, Instant}, thread, io
+        time::{Duration, Instant}, 
+        thread, 
+        io
     };
     use std::convert::From;
 
     const TICK_RATE: Duration = Duration::from_millis(200);
+    const COMPLETED_ITEM: [char; 2] = [' ', 'X'];
 
     enum Event<T> {
         Input(T),
@@ -28,6 +30,7 @@ pub mod tui_handler {
         DebugPrinting,
         Quitting,
         AddingTodo,
+        CompletingTodo,
     }
 
     enum UserAction<'a> {
@@ -35,7 +38,8 @@ pub mod tui_handler {
         DebugMsg(&'a str),
         Quit,
         AddTodo,
-        SubmitInput,
+        CompeleteTodo,
+        SubmitBuffer,
         Input(char),
     }
 
@@ -78,43 +82,62 @@ pub mod tui_handler {
 
         render_viewing(&mut terminal, &todo_items).unwrap();
         loop {            
+
+            //waits for user-input to render
             let input_result = match rx.recv().unwrap() {
                 Event::Input(input) => handle_input(input, &current_state),
                 Event::Tick => continue,
             };
+            
+            //deals with key events
             { 
                 let mut current_state_data = current_state.lock().unwrap();
-                match input_result {
-                    Some(result) => { 
-                        match result {
-                            UserAction::View => {
-                                *current_state_data = State::Viewing;
-                                output_buffer = String::from("");
-                            },
-                            UserAction::SubmitInput => {
-                                *current_state_data = State::Viewing;
-                                todo.add_item(&output_buffer)?;
-                                todo_items = generate_todo(todo);
-                                output_buffer = String::from("");
-                            },
-                            UserAction::DebugMsg(msg) => {
-                                *current_state_data = State::DebugPrinting;
-                                output_buffer = msg.to_string();
+
+                if let Some(result) = input_result {
+                    match result {
+                        UserAction::View => {
+                            *current_state_data = State::Viewing;
+                            output_buffer = String::from("");
+                        },
+                        //handles user buffer input
+                        UserAction::SubmitBuffer => {
+                            match *current_state_data {
+                                State::AddingTodo =>  {
+                                    todo.add_item(&output_buffer)?;
+                                },
+                                State::CompletingTodo => {
+                                    todo.complete_item(
+                                        output_buffer
+                                        .parse::<usize>()
+                                        .unwrap()).unwrap();
+                                }
+                                _ => {}
                             }
-                            UserAction::Quit => *current_state_data = State::Quitting,
-                            UserAction::AddTodo => *current_state_data = State::AddingTodo, 
-                            UserAction::Input(input) => output_buffer.push(input),
+                            *current_state_data = State::Viewing;
+                            todo_items = generate_todo(todo);
+                            output_buffer = String::from("");
+                        },
+
+                        UserAction::DebugMsg(msg) => {
+                            *current_state_data = State::DebugPrinting;
+                            output_buffer = msg.to_string();
                         }
+                        UserAction::Quit => *current_state_data = State::Quitting,
+                        UserAction::AddTodo => *current_state_data = State::AddingTodo, 
+                        UserAction::CompeleteTodo => *current_state_data = State::CompletingTodo,
+                        UserAction::Input(input) => output_buffer.push(input),
                     }
-                    None => {}
                 } 
             }
+
+            //render the correct state
             {
                 let current_state_data = current_state.lock().unwrap();
                 match *current_state_data {
                     State::Viewing => render_viewing(&mut terminal, &todo_items)?,
                     State::DebugPrinting => render_debugging(&mut terminal, &output_buffer, &todo_items)?,
                     State::AddingTodo => render_adding(&mut terminal, &output_buffer, &todo_items)?,
+                    State::CompletingTodo => render_completing(&mut terminal, &output_buffer, &todo_items)?,
                     State::Quitting => {
                         disable_raw_mode().unwrap();
                         return Ok(());
@@ -149,7 +172,8 @@ pub mod tui_handler {
     fn handle_input<'a>(input: CEvent::KeyEvent, current_state: &Arc<Mutex<State>>) -> Option<UserAction<'a>> { 
         use crossterm::event::KeyCode;
         let current_state_data = current_state.lock().unwrap();
-
+        
+        //handles user actions in normal mode
         if let State::Viewing = *current_state_data {
             let key = match input.code {    
                 KeyCode::Char(input) => input,  
@@ -160,13 +184,15 @@ pub mod tui_handler {
                 'd' => Some(UserAction::DebugMsg("Hello World!")),
                 'q' => Some(UserAction::Quit),
                 'n' => Some(UserAction::AddTodo),
+                'c' => Some(UserAction::CompeleteTodo),
                 _ => None 
             };    
         }
-
+        
+        //handles user actions when in buffer mode
         match input.code {
             KeyCode::Char(input) => return Some(UserAction::Input(input)),
-            KeyCode::Enter => return Some(UserAction::SubmitInput), 
+            KeyCode::Enter => return Some(UserAction::SubmitBuffer), 
             KeyCode::Esc => return Some(UserAction::View),
             _ => return None
         };  
@@ -174,8 +200,15 @@ pub mod tui_handler {
 
     fn generate_todo(todo: &TodoList) -> String {
         let mut todo_str = String::new();
-        todo.items.iter().for_each(|(id, item)| {
-            todo_str.push_str(&format!("{id} - {item_name} [{completed}]\n", item_name = item.title, completed = "")); 
+        todo.items
+            .iter()
+            .enumerate()
+            .for_each(|(index, item)| { 
+                todo_str.push_str(&format!(
+                        "{index} - {item_name} [{completed}]\n", 
+                        item_name = item.title, 
+                        completed = if !item.completed {COMPLETED_ITEM[0]} else {COMPLETED_ITEM[1]}
+                        )); 
         });
         
         return todo_str;

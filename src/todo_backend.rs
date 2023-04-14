@@ -1,40 +1,45 @@
 pub mod todo{
-    use std::collections::HashMap;
+    use std::vec::Vec;
+    
+    #[derive(Debug)]
+    pub enum TodoError {
+        TodoOutOfBoundsError,
+    }
+
     pub struct TodoList {
-        next_id: usize,
-        pub items: HashMap<usize, TodoItem>,
+        pub items: Vec<TodoItem>,
     } impl TodoList {
         pub fn new() -> TodoList {
             TodoList {
-                next_id: 1,
-                items: HashMap::<usize, TodoItem>::new(),
+                items: Vec::new(),
             }
         }
         pub fn add_item(&mut self, item_title: &str) -> Result<usize, &str> {
-            self.items.insert(self.next_id, TodoItem::new(item_title.to_string()));
-            self.next_id += 1;
-            return Ok(self.next_id - 1);
+            self.items.push(TodoItem::new(item_title.to_string()));
+            return Ok(self.items.len() - 1);
         } 
-        pub fn complete_item(&mut self, item_id: usize) -> Result<(), &str> {
-            match self.items.get_mut(&item_id) {
-                None => return Err("Item doesn't Exist"),
-                Some(result) => result.completed = true 
-            } 
+        pub fn complete_item(&mut self, item_id: usize) -> Result<(), TodoError> {
+            if item_id > self.items.len() - 1 {
+                return Err(TodoError::TodoOutOfBoundsError);
+            }
+            self.items[item_id].completed = true;
             return Ok(())
         } 
         pub fn print_list(&self) {
             self.items
                 .iter()
-                .for_each(|(id, item)| {
-                    print!("{id}. ");
+                .enumerate()
+                .for_each(|(index, item)| {
+                    print!("{index}. ");
                     item.print(); 
                 })
         }
         pub fn find_item_id(&self, item_title: &str) -> Option<usize> {
             match self.items
                 .iter()
-                .find(|(_, item)| item.title == item_title) {
-                    Some((id, _)) => Some(*id),
+                .enumerate()
+                .find(|(index, item)| item.title == item_title) {
+                    Some((id, _)) => Some(id),
                     None => None
                 }
         }

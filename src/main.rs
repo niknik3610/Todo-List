@@ -7,6 +7,7 @@ fn main() {
     let mut list = TodoList::new();
     list.add_item("Write todo list").unwrap();
     list.add_item("Your Mom").unwrap();
+    list.complete_item(0).unwrap();
 
     tui_handler::tui_handler::run_tui(&mut list).unwrap();
 }
