@@ -18,8 +18,8 @@ There are two modes currently: Insert and Viewing mode. Within insert and comple
 - c: Enter the id into the buffer, of the todo-item to complete the item
 
 # Dependencies
-Tui-rs: https://crates.io/crates/serde
-Crossterm: https://crates.io/crates/crossterm
+Tui-rs: https://crates.io/crates/serde \
+Crossterm: https://crates.io/crates/crossterm \
 Serde: https://crates.io/crates/serde
 
 # References
