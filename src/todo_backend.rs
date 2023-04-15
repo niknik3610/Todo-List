@@ -1,15 +1,30 @@
 pub mod todo{
+    use core::fmt;
+    use std::error::Error;
     use std::vec::Vec;
     use serde::{
         Serialize,
         Deserialize
     };
-    
+
     #[derive(Debug)]
     pub enum TodoError {
         TodoOutOfBoundsError,
+        TodoAddingError
     }
+
+    impl fmt::Display for TodoError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                TodoError::TodoOutOfBoundsError => write!(f, "Input out of bounds"),
+                TodoError::TodoAddingError => write!(f, "Adding failed")
+            }
+        }
+    }
+    impl Error for TodoError {}
     
+
+
     #[derive(Serialize, Deserialize)]
     pub struct TodoList {
         pub todo_items: Vec<TodoItem>,
@@ -21,7 +36,7 @@ pub mod todo{
                 completed_items: Vec::new(),
             }
         }
-        pub fn add_item(&mut self, item_title: &str) -> Result<usize, &str> {
+        pub fn add_item(&mut self, item_title: &str) -> Result<usize, Box<dyn Error>> {
             self.todo_items.push(TodoItem::new(item_title.to_string()));
             return Ok(self.todo_items.len() - 1);
         } 

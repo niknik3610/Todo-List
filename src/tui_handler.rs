@@ -1,4 +1,3 @@
-#[allow(dead_code)]     //TODO: remove
 mod todo_renderers;
 pub mod tui_handler {
     use crate::todo_backend::todo::TodoList;
@@ -7,6 +6,7 @@ pub mod tui_handler {
     use crossterm::event as CEvent;
     use tui::backend::CrosstermBackend;
     use tui::Terminal;
+    use std::error::Error;
     use std::sync::{Arc, Mutex};
     use std::{
         sync::mpsc::channel,
@@ -19,6 +19,8 @@ pub mod tui_handler {
 
     const TICK_RATE: Duration = Duration::from_millis(200);
     const COMPLETED_ITEM: [char; 2] = [' ', 'X'];
+
+    type ErrorReturn = Box<dyn Error>;
 
     enum Event<T> {
         Input(T),
@@ -40,12 +42,13 @@ pub mod tui_handler {
         CompeleteTodo,
         UncompleteTodo,
         //input Actions
-        SubmitBuffer,
         Input(char),
+        SubmitBuffer,
         Backspace,
+        None,
     }
 
-    pub fn run_tui(todo_list: &mut TodoList) -> Result<(), String> {
+    pub fn run_tui(todo_list: &mut TodoList) -> Result<(), ErrorReturn> {
         let current_state = Arc::new(Mutex::new(State::Viewing));
         let current_state_input = current_state.clone();
 
@@ -101,46 +104,33 @@ pub mod tui_handler {
             { 
                 let mut current_state_data = current_state.lock().unwrap();
 
-                if let Some(result) = input_result {
-                    match result {
+                let result = match input_result {
+                    Ok(result) => result,
+                    Err(e) => todo!(), 
+                }; 
+
+                match result {
                         UserAction::View => {
                             *current_state_data = State::Viewing;
                             output_buffer = String::from("");
                         },
+                        UserAction::Input(input) => output_buffer.push(input),
                         //handles user buffer input
                         UserAction::SubmitBuffer => {
-                            match *current_state_data {
-                                State::AddingTodo =>  {
-                                    todo.add_item(&output_buffer)?;
-                                },
-                                State::CompletingTodo => {
-                                    todo.complete_item(
-                                        output_buffer
-                                        .parse::<usize>()
-                                        .unwrap()).unwrap();
-                                }
-                                State::UncompletingTodo => {
-                                    todo.uncomplete_item(
-                                        output_buffer
-                                        .parse::<usize>()
-                                        .unwrap()).unwrap();
-                                }
-                                _ => {}
-                            }
+                            submit_buffer(&current_state_data, &output_buffer[..], todo)?;
+                            
                             *current_state_data = State::Viewing;
                             todo_items = generate_todo(todo);
                             output_buffer = String::from("");
-                        }, 
-                        UserAction::Input(input) => output_buffer.push(input),
+                        },                         
                         UserAction::Backspace => {output_buffer.pop();},
                         //just change the state depending on user action
                         UserAction::Quit => *current_state_data = State::Quitting,
                         UserAction::AddTodo => *current_state_data = State::AddingTodo, 
                         UserAction::CompeleteTodo => *current_state_data = State::CompletingTodo,
                         UserAction::UncompleteTodo => *current_state_data = State::UncompletingTodo,
-
+                        UserAction::None => continue
                     }
-                } 
             }
 
             //render the correct state
@@ -168,7 +158,7 @@ pub mod tui_handler {
     fn capture_input(
         sx: &Sender<Event<CEvent::KeyEvent>>, 
         current_tick_time: &mut Instant
-        ) -> Result<(), Box<dyn std::error::Error>> {
+        ) -> Result<(), ErrorReturn> {
        
         let event_timer = TICK_RATE
             .checked_sub(current_tick_time.elapsed())
@@ -192,7 +182,7 @@ pub mod tui_handler {
 
     fn handle_input<'a>(
         input: CEvent::KeyEvent,
-        current_state: &Arc<Mutex<State>>) -> Option<UserAction> { 
+        current_state: &Arc<Mutex<State>>) -> Result<UserAction, ErrorReturn> { 
         use crossterm::event::KeyCode;
         let current_state_data = current_state.lock().unwrap();
         
@@ -200,25 +190,25 @@ pub mod tui_handler {
         if let State::Viewing = *current_state_data {
             let key = match input.code {    
                 KeyCode::Char(input) => input,  
-                _ => return None
+                _ => return Ok(UserAction::None)
             };
 
             return match key {
-                'q' => Some(UserAction::Quit),
-                'n' => Some(UserAction::AddTodo),
-                'c' => Some(UserAction::CompeleteTodo),
-                'u' => Some(UserAction::UncompleteTodo),
-                _ => None 
+                'q' => Ok(UserAction::Quit),
+                'n' => Ok(UserAction::AddTodo),
+                'c' => Ok(UserAction::CompeleteTodo),
+                'u' => Ok(UserAction::UncompleteTodo),
+                _ => Ok(UserAction::None) 
             };    
         }
         
         //handles user actions when in buffer mode
         match input.code {
-            KeyCode::Char(input) => return Some(UserAction::Input(input)),
-            KeyCode::Backspace => return Some(UserAction::Backspace),
-            KeyCode::Enter => return Some(UserAction::SubmitBuffer), 
-            KeyCode::Esc => return Some(UserAction::View),
-            _ => return None
+            KeyCode::Char(input) => return Ok(UserAction::Input(input)),
+            KeyCode::Backspace => return Ok(UserAction::Backspace),
+            KeyCode::Enter => return Ok(UserAction::SubmitBuffer), 
+            KeyCode::Esc => return Ok(UserAction::View),
+            _ => return Ok(UserAction::None)
         };  
     }
 
@@ -249,5 +239,29 @@ pub mod tui_handler {
             
         
         return todo_str;
+    }
+
+    fn submit_buffer(
+        current_state_data: &State, 
+        output_buffer: &str,
+        todo: &mut TodoList) -> Result<(), ErrorReturn> {
+            match *current_state_data {
+            State::AddingTodo =>  {
+                todo.add_item(&output_buffer)?;
+            },
+            State::CompletingTodo => {
+                todo.complete_item(
+                    output_buffer
+                    .parse::<usize>()
+                    .unwrap()).unwrap();
+            }
+            State::UncompletingTodo => {
+                todo.uncomplete_item(
+                    output_buffer
+                    .parse::<usize>()?)?
+            }
+            _ => {}
+        }
+        return Ok(())
     }
 }
