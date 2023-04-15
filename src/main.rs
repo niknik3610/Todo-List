@@ -1,14 +1,11 @@
 use crate::todo_backend::todo::TodoList;
+use crate::data_handler::data_handler::*;
 mod todo_backend;
 mod data_handler;
 mod tui_handler;
 
 fn main() {    
-    let mut list = TodoList::new();
-    list.add_item("Write todo list").unwrap();
-    list.add_item("Your Mom").unwrap();
-    list.complete_item(0).unwrap();
-
+    let mut list = load_todo_list().unwrap();
     tui_handler::tui_handler::run_tui(&mut list).unwrap();
-    data_handler::data_handler::save_todo_list(&list);
+    data_handler::data_handler::save_todo_list(&list).unwrap();
 }
