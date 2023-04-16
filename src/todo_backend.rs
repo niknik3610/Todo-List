@@ -1,11 +1,11 @@
 pub mod todo{
     use core::fmt;
-    use std::error::Error;
-    use std::vec::Vec;
+    use std::{vec::Vec, io::ErrorKind};
     use serde::{
         Serialize,
         Deserialize
     };
+        use std::{io::Result as ResultIo, error::Error};
 
     #[derive(Debug)]
     pub enum TodoError {
@@ -36,21 +36,21 @@ pub mod todo{
                 completed_items: Vec::new(),
             }
         }
-        pub fn add_item(&mut self, item_title: &str) -> Result<usize, Box<dyn Error>> {
+        pub fn add_item(&mut self, item_title: &str) -> ResultIo<usize> {
             self.todo_items.push(TodoItem::new(item_title.to_string()));
             return Ok(self.todo_items.len() - 1);
         } 
-        pub fn complete_item(&mut self, item_id: usize) -> Result<(), TodoError> {
+        pub fn complete_item(&mut self, item_id: usize) -> ResultIo<()> {
             if item_id > self.todo_items.len() - 1 {
-                return Err(TodoError::TodoOutOfBoundsError);
+                return Err(ErrorKind::InvalidInput.into());
             }
             self.todo_items[item_id].completed = true;
             self.completed_items.push(self.todo_items.remove(item_id));
             return Ok(())
         } 
-        pub fn uncomplete_item(&mut self, item_id: usize) -> Result<(), TodoError> {
-            if item_id > self.todo_items.len() - 1 {
-                return Err(TodoError::TodoOutOfBoundsError);
+        pub fn uncomplete_item(&mut self, item_id: usize) -> ResultIo<()> {
+            if item_id > self.todo_items.len() - 1 { 
+                return Err(ErrorKind::InvalidInput.into());
             }
             self.completed_items[item_id].completed = false;
             self.todo_items.push(self.completed_items.remove(item_id));

@@ -7,6 +7,7 @@ pub mod tui_handler {
     use tui::backend::CrosstermBackend;
     use tui::Terminal;
     use std::error::Error;
+    use std::io::ErrorKind;
     use std::sync::{Arc, Mutex};
     use std::{
         sync::mpsc::channel,
@@ -16,11 +17,12 @@ pub mod tui_handler {
         io
     };
     use std::convert::From;
+    use std::io::Stdout;
 
     const TICK_RATE: Duration = Duration::from_millis(200);
     const COMPLETED_ITEM: [char; 2] = [' ', 'X'];
 
-    type ErrorReturn = Box<dyn Error>;
+    type ResultIo<T> = Result<T, io::Error>;
 
     enum Event<T> {
         Input(T),
@@ -48,7 +50,7 @@ pub mod tui_handler {
         None,
     }
 
-    pub fn run_tui(todo_list: &mut TodoList) -> Result<(), ErrorReturn> {
+    pub fn run_tui(todo_list: &mut TodoList) -> ResultIo<()> {
         let current_state = Arc::new(Mutex::new(State::Viewing));
         let current_state_input = current_state.clone();
 
@@ -89,7 +91,7 @@ pub mod tui_handler {
 
         let stdout = io::stdout();
         let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend)?; 
+        let mut terminal = Terminal::new(backend).expect("Creating Terminal Failed"); 
 
         render_viewing(&mut terminal, &todo_items).unwrap();
         loop {            
@@ -106,7 +108,10 @@ pub mod tui_handler {
 
                 let result = match input_result {
                     Ok(result) => result,
-                    Err(e) => todo!(), 
+                    Err(e) => {
+                        handle_errors(e, &mut terminal, &todo_items)?;
+                        continue;
+                    }
                 }; 
 
                 match result {
@@ -158,7 +163,7 @@ pub mod tui_handler {
     fn capture_input(
         sx: &Sender<Event<CEvent::KeyEvent>>, 
         current_tick_time: &mut Instant
-        ) -> Result<(), ErrorReturn> {
+        ) -> ResultIo<()> {
        
         let event_timer = TICK_RATE
             .checked_sub(current_tick_time.elapsed())
@@ -180,9 +185,9 @@ pub mod tui_handler {
         Ok(()) 
     }
 
-    fn handle_input<'a>(
+    fn handle_input(
         input: CEvent::KeyEvent,
-        current_state: &Arc<Mutex<State>>) -> Result<UserAction, ErrorReturn> { 
+        current_state: &Arc<Mutex<State>>) -> ResultIo<UserAction> { 
         use crossterm::event::KeyCode;
         let current_state_data = current_state.lock().unwrap();
         
@@ -244,7 +249,7 @@ pub mod tui_handler {
     fn submit_buffer(
         current_state_data: &State, 
         output_buffer: &str,
-        todo: &mut TodoList) -> Result<(), ErrorReturn> {
+        todo: &mut TodoList) -> ResultIo<()> {
             match *current_state_data {
             State::AddingTodo =>  {
                 todo.add_item(&output_buffer)?;
@@ -257,11 +262,25 @@ pub mod tui_handler {
             }
             State::UncompletingTodo => {
                 todo.uncomplete_item(
-                    output_buffer
-                    .parse::<usize>()?)?
+                    match output_buffer.parse::<usize>() {
+                        Ok(r) => r,
+                        Err(_) => return Err(ErrorKind::InvalidInput.into()) 
+                    })?;
             }
             _ => {}
         }
         return Ok(())
+    }
+
+    fn handle_errors(e: io::Error, terminal: &mut Terminal<CrosstermBackend<Stdout>>, todo: &String) 
+        -> ResultIo<()>{ 
+            use ErrorKind::*;
+            match e.kind() {
+                InvalidInput => {
+                    render_error(terminal, "Error: Invalid Input", &todo).unwrap();
+                    return Ok(());
+                }
+                _ => return Err(ErrorKind::Other.into())
+            }
     }
 }

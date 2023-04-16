@@ -4,7 +4,7 @@ pub mod data_handler {
 
     const DB_PATH: &str = "Todo_Data"; 
 
-    pub fn load_todo_list() -> Result<TodoList, io::Error> {
+    pub fn load_todo_list() -> io::Result<TodoList> {
         let mut file = File::open(DB_PATH)?;
         let mut file_contents = String::new();
         file.read_to_string(&mut file_contents)?;
@@ -13,18 +13,21 @@ pub mod data_handler {
         return Ok(todo);
     }
 
-    pub fn save_todo_list(todo_list: &TodoList) -> Result<(), io::Error> {
+    pub fn save_todo_list(todo_list: &TodoList) -> io::Result<()> {
         let serialized_todo = serde_json::to_string(&todo_list)?;
         let mut file = File::create(DB_PATH)?;
         file.write_all(serialized_todo.as_bytes())?;
         return Ok(())
     }
 
-    pub fn handle_opening_errors(e: io::Error) -> Result<(), ()> {
+    pub fn handle_data_errors(e: io::Error) -> Result<(), ()> {
         match e.kind() {
             io::ErrorKind::NotFound => {
                 let mut file =  File::create(DB_PATH).unwrap();
-                file.write_all(b"{\"todo_items\":[],\"completed_items\":[]}"); 
+                match file.write_all(b"{\"todo_items\":[],\"completed_items\":[]}") {
+                    Ok(_) => {},
+                    Err(_) => return Err(())
+                }
                 println!("Todo file generated"); 
                 return Ok(());
             }
