@@ -100,7 +100,7 @@ pub mod tui_handler {
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend).expect("Creating Terminal Failed"); 
 
-        render_viewing(&mut terminal, &todo_items).unwrap();
+        render_main(&mut terminal, BufferType::None, &todo_items).unwrap();
         loop {            
             //waits for user-input to render
             let input_result = match rx.recv().unwrap() {
@@ -158,13 +158,13 @@ pub mod tui_handler {
                 let mut current_state_data = current_state.lock().unwrap();
                 match *current_state_data {
                     State::Viewing => 
-                        render_viewing(&mut terminal, &todo_items)?,
+                        render_main(&mut terminal, BufferType::None, &todo_items)?,
                     State::AddingTodo => 
-                        render_with_buffer(&mut terminal, &output_buffer, &todo_items, "Adding: ")?,
+                        render_main(&mut terminal, BufferType::AddingTask(&output_buffer), &todo_items)?,
                     State::CompletingTodo => 
-                        render_with_buffer(&mut terminal, &output_buffer, &todo_items, "Completing: ")?,
+                        render_main(&mut terminal, BufferType::CompletingTask(&output_buffer), &todo_items)?,
                     State::UncompletingTodo =>
-                        render_with_buffer(&mut terminal, &output_buffer, &todo_items, "Unclompleting: ")?, 
+                        render_main(&mut terminal,BufferType::UncompletingTask(&output_buffer), &todo_items)?,
                     State::Error => *current_state_data = State::Viewing,                    
                     State::Quitting => {
                         disable_raw_mode().unwrap();
@@ -288,12 +288,12 @@ pub mod tui_handler {
         return Ok(())
     }
 
-    fn handle_errors(e: &io::Error, terminal: &mut Terminal<CrosstermBackend<Stdout>>, todo: &String) 
+    fn handle_errors(e: &io::Error, terminal: &mut Terminal<CrosstermBackend<Stdout>>, todo_items: &String) 
         -> ResultIo<()>{ 
             use ErrorKind::*;
             match e.kind() {
                 InvalidInput => {
-                    render_error(terminal, "Error: Invalid Input", &todo).unwrap();
+                    render_main(terminal, BufferType::Error("Invalid Input"), todo_items).unwrap();
                     return Ok(());
                 }
                 _ => return Err(ErrorKind::Other.into())
