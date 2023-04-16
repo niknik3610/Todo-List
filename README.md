@@ -12,12 +12,12 @@ cargo build --release
 You can find the built app in the target/release directory within your project folder. Just open it through your terminal.
 
 ## KeyBinds
-There are two modes currently: Insert and Viewing mode. Within insert and completion mode your keystrokes will be entered into a buffer in the header bar, press escape to leave Insert mode, or enter to complete your entry. Viewing mode has two keybinds at the moment:
+There is currently only one mode: Command mode. By pressing the appropriate kindbind (view below), your keystrokes will be entered into a buffer in the command bar at the bottom of the screen. Press escape to delete the current buffer, or enter to complete your entry. These are the current keybinds (plan is for them to be remapable in the future):
 
-- q: Quits the app and returns your terminal to the normal mode
+- q: Quits the app and returns your terminal to the normal mode.
 - n: Insert a new entry into your todo-list, by entering it's name into the buffer
-- c: Completes a Todo item, enter the id into the buffer of the item that you want to complete
-- u: Uncompletes a Todo item, enter the id into the buffer of the item that you want to uncomplete
+- c: Completes a Todo item, enter the id of the item you want to complete into the buffer 
+- u: Uncompletes a Todo item, enter the id of the item you want to uncomplete into the buffer 
 
 ## Dependencies
 Tui-rs: https://crates.io/crates/serde \
