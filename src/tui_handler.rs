@@ -35,6 +35,7 @@ pub mod tui_handler {
         AddingTodo,
         CompletingTodo,
         UncompletingTodo,
+        Error
     }
 
     enum UserAction {
@@ -72,8 +73,14 @@ pub mod tui_handler {
             }
         }));
 
-        tui_handler(&rx, current_state, todo_list).expect("TUI handler crashed");
-        
+        match tui_handler(&rx, current_state, todo_list) {
+            Ok(_) => {},
+            Err(e) => {
+                disable_raw_mode().unwrap(); 
+                eprintln!("{:?}", e);
+                panic!();
+            }
+        }
         threads
             .into_iter()
             .for_each(|thread| thread.join().unwrap());
@@ -95,7 +102,6 @@ pub mod tui_handler {
 
         render_viewing(&mut terminal, &todo_items).unwrap();
         loop {            
-
             //waits for user-input to render
             let input_result = match rx.recv().unwrap() {
                 Event::Input(input) => handle_input(input, &current_state),
@@ -108,8 +114,8 @@ pub mod tui_handler {
 
                 let result = match input_result {
                     Ok(result) => result,
-                    Err(e) => {
-                        handle_errors(e, &mut terminal, &todo_items)?;
+                    Err(e) => { 
+                        handle_errors(&e, &mut terminal, &todo_items)?;
                         continue;
                     }
                 }; 
@@ -117,12 +123,21 @@ pub mod tui_handler {
                 match result {
                         UserAction::View => {
                             *current_state_data = State::Viewing;
-                            output_buffer = String::from("");
+                            output_buffer = String::new();
                         },
                         UserAction::Input(input) => output_buffer.push(input),
                         //handles user buffer input
                         UserAction::SubmitBuffer => {
-                            submit_buffer(&current_state_data, &output_buffer[..], todo)?;
+                            match submit_buffer(&current_state_data, &output_buffer[..], todo) {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    handle_errors(&e, &mut terminal, &todo_items)?;
+                                    *current_state_data = State::Viewing;
+                                    output_buffer = String::new();
+                                    continue;
+                                }
+
+                            }
                             
                             *current_state_data = State::Viewing;
                             todo_items = generate_todo(todo);
@@ -140,7 +155,7 @@ pub mod tui_handler {
 
             //render the correct state
             {
-                let current_state_data = current_state.lock().unwrap();
+                let mut current_state_data = current_state.lock().unwrap();
                 match *current_state_data {
                     State::Viewing => 
                         render_viewing(&mut terminal, &todo_items)?,
@@ -150,6 +165,7 @@ pub mod tui_handler {
                         render_with_buffer(&mut terminal, &output_buffer, &todo_items, "Completing: ")?,
                     State::UncompletingTodo =>
                         render_with_buffer(&mut terminal, &output_buffer, &todo_items, "Unclompleting: ")?, 
+                    State::Error => *current_state_data = State::Viewing,                    
                     State::Quitting => {
                         disable_raw_mode().unwrap();
                         return Ok(());
@@ -241,8 +257,7 @@ pub mod tui_handler {
                         completed = if !item.completed {COMPLETED_ITEM[0]} else {COMPLETED_ITEM[1]}
                         )); 
         });
-            
-        
+             
         return todo_str;
     }
 
@@ -256,9 +271,10 @@ pub mod tui_handler {
             },
             State::CompletingTodo => {
                 todo.complete_item(
-                    output_buffer
-                    .parse::<usize>()
-                    .unwrap()).unwrap();
+                    match output_buffer.parse::<usize>() {
+                        Ok(r) => r,
+                        Err(_) => return Err(ErrorKind::InvalidInput.into()) 
+                    })?;
             }
             State::UncompletingTodo => {
                 todo.uncomplete_item(
@@ -272,7 +288,7 @@ pub mod tui_handler {
         return Ok(())
     }
 
-    fn handle_errors(e: io::Error, terminal: &mut Terminal<CrosstermBackend<Stdout>>, todo: &String) 
+    fn handle_errors(e: &io::Error, terminal: &mut Terminal<CrosstermBackend<Stdout>>, todo: &String) 
         -> ResultIo<()>{ 
             use ErrorKind::*;
             match e.kind() {
