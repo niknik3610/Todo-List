@@ -2,12 +2,16 @@ mod todo_renderers;
 pub mod tui_handler {
     use crate::todo_backend::todo::TodoList;
     use crate::tui_handler::todo_renderers::*;
-    use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
+
+    use crossterm::execute;
+    use crossterm::terminal::LeaveAlternateScreen;
+    use crossterm::terminal::{enable_raw_mode, disable_raw_mode,self as cTerm};
     use crossterm::event as CEvent;
     use tui::backend::CrosstermBackend;
     use tui::Terminal;
     use std::error::Error;
     use std::io::ErrorKind;
+    use std::io::stdout;
     use std::sync::{Arc, Mutex};
     use std::{
         sync::mpsc::channel,
@@ -52,10 +56,12 @@ pub mod tui_handler {
     }
 
     pub fn run_tui(todo_list: &mut TodoList) -> ResultIo<()> {
+        enable_raw_mode().expect("Raw Mode");
+        execute!(stdout(), cTerm::EnterAlternateScreen).unwrap();
+
         let current_state = Arc::new(Mutex::new(State::Viewing));
         let current_state_input = current_state.clone();
 
-        enable_raw_mode().expect("Raw Mode");
         let (sx, rx) = channel();
         let mut threads = Vec::new(); 
 
@@ -84,6 +90,8 @@ pub mod tui_handler {
         threads
             .into_iter()
             .for_each(|thread| thread.join().unwrap());
+
+        execute!(stdout(), LeaveAlternateScreen).unwrap();
         return Ok(());
     }
 
@@ -115,7 +123,7 @@ pub mod tui_handler {
                 let result = match input_result {
                     Ok(result) => result,
                     Err(e) => { 
-                        handle_errors(&e, &mut terminal, &todo_items)?;
+                        handle_errors(e, &mut terminal, &todo_items)?;
                         continue;
                     }
                 }; 
@@ -131,7 +139,7 @@ pub mod tui_handler {
                             match submit_buffer(&current_state_data, &output_buffer[..], todo) {
                                 Ok(_) => {},
                                 Err(e) => {
-                                    handle_errors(&e, &mut terminal, &todo_items)?;
+                                    handle_errors(e, &mut terminal, &todo_items)?;
                                     *current_state_data = State::Viewing;
                                     output_buffer = String::new();
                                     continue;
@@ -288,7 +296,7 @@ pub mod tui_handler {
         return Ok(())
     }
 
-    fn handle_errors(e: &io::Error, terminal: &mut Terminal<CrosstermBackend<Stdout>>, todo_items: &String) 
+    fn handle_errors(e: io::Error, terminal: &mut Terminal<CrosstermBackend<Stdout>>, todo_items: &String) 
         -> ResultIo<()>{ 
             use ErrorKind::*;
             match e.kind() {
@@ -296,7 +304,7 @@ pub mod tui_handler {
                     render_main(terminal, BufferType::Error("Invalid Input"), todo_items).unwrap();
                     return Ok(());
                 }
-                _ => return Err(ErrorKind::Other.into())
+                _ => return Err(e)
             }
     }
 }

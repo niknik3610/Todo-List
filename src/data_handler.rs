@@ -5,7 +5,13 @@ pub mod data_handler {
     const DB_PATH: &str = "Todo_Data"; 
 
     pub fn load_todo_list() -> io::Result<TodoList> {
-        let mut file = File::open(DB_PATH)?;
+        let mut file = match File::open(DB_PATH) {
+            Ok(r) => r,
+            Err(_) => {
+                generate_file()?;
+                File::open(DB_PATH)?
+            }
+        };
         let mut file_contents = String::new();
         file.read_to_string(&mut file_contents)?;
 
@@ -20,22 +26,21 @@ pub mod data_handler {
         return Ok(())
     }
 
-    pub fn handle_data_errors(e: io::Error) -> Result<(), ()> {
-        match e.kind() {
-            io::ErrorKind::NotFound => {
-                let mut file =  File::create(DB_PATH).unwrap();
-                match file.write_all(b"{\"todo_items\":[],\"completed_items\":[]}") {
-                    Ok(_) => {},
-                    Err(_) => return Err(())
-                }
-                println!("Todo file generated"); 
-                return Ok(());
-            }
+    fn generate_file() -> io::Result<()> {
+        let mut file =  File::create(DB_PATH)?;
+        match file.write_all(b"{\"todo_items\":[],\"completed_items\":[]}") {
+            Ok(_) => return Ok(()),
+            Err(e) => return Err(e)
+        }
+    }
+
+    pub fn handle_data_errors(e: io::Error) -> io::Result<()>{
+        match e.kind() {  
             io::ErrorKind::PermissionDenied => {
                 println!("App does not have permission to access save file");
-                return Err(());
+                return Err(e);
             }
-            _ => return Err(())
+            _ => return Err(e)
         }
     }
 

@@ -9,10 +9,15 @@ fn main() {
     //error handling the load file
    
     env::set_var("RUST_BACKTRACE", "1");
+
+    //get rid of this probably
     let mut list = load_todo_list().unwrap_or_else(|e| 
         match handle_data_errors(e) {
             Ok(()) => load_todo_list().unwrap(),
-            Err(()) => exit(1)
+            Err(e) => {
+                eprintln!("{:?}", e);
+                exit(1);
+            }
         }
     );
 
