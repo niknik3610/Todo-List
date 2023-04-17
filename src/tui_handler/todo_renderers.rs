@@ -1,11 +1,10 @@
 use std::io::Stdout;
 
 use tui::{
-    Terminal, 
-    backend::CrosstermBackend, 
-    layout, 
-    widgets, 
-    style::{Style, Color, Modifier}
+    backend::CrosstermBackend,
+    layout,
+    style::{Color, Modifier, Style},
+    widgets, Terminal,
 };
 
 pub enum BufferType<'a> {
@@ -20,70 +19,74 @@ pub fn render_main(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     buffer: BufferType,
     todo_items: &String,
-    ) -> Result<(), Box<dyn std::error::Error>> { 
-
+) -> Result<(), Box<dyn std::error::Error>> {
     let command_contents = match buffer {
         BufferType::None => "Command Mode".to_owned(),
         BufferType::AddingTask(b) => "Adding: ".to_owned() + b,
         BufferType::CompletingTask(b) => "CompletingTask: ".to_owned() + b,
         BufferType::UncompletingTask(b) => "UncompletingTask: ".to_owned() + b,
-        BufferType::Error(e) => "Error: ".to_owned() + e
+        BufferType::Error(e) => "Error: ".to_owned() + e,
     };
 
-    terminal.draw(|rec| {
-        let size = rec.size();
-        let chunks = layout::Layout::default()
-            .direction(layout::Direction::Vertical)
-            .margin(2)
-            .constraints([
-                         layout::Constraint::Length(3),     //Adding
-                         layout::Constraint::Min(2),        //Content
-                         layout::Constraint::Length(3)      //Footer
-            ]
-            .as_ref()
-            )
-            .split(size);                   
+    terminal
+        .draw(|rec| {
+            let size = rec.size();
+            let chunks = layout::Layout::default()
+                .direction(layout::Direction::Vertical)
+                .margin(2)
+                .constraints(
+                    [
+                        layout::Constraint::Length(3), //Adding
+                        layout::Constraint::Min(2),    //Content
+                        layout::Constraint::Length(3), //Footer
+                    ]
+                    .as_ref(),
+                )
+                .split(size);
 
-        let header =
-            widgets::Paragraph::new("TODO LIST")
-            .style(Style::default().fg(Color::LightCyan))
-            .alignment(layout::Alignment::Center)
-            .block(
-                widgets::Block::default()
-                .borders(widgets::Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .border_type(widgets::BorderType::Plain)
+            let header = widgets::Paragraph::new("TODO LIST")
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(layout::Alignment::Center)
+                .block(
+                    widgets::Block::default()
+                        .borders(widgets::Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .border_type(widgets::BorderType::Plain),
                 );
 
-        let content = 
-            widgets::Paragraph::new(todo_items.clone())
-            .style(Style::default().fg(Color::LightCyan))
-            .alignment(layout::Alignment::Center)
-            .block(
-                widgets::Block::default()
-                .borders(widgets::Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .border_type(widgets::BorderType::Plain)
-                );
-        
-
-        let command_buffer = 
-            widgets::Paragraph::new(command_contents)
-            .style(Style::default().fg(
-                    if let BufferType::Error(_) = buffer {Color::Red} else {Color::LightCyan})
-                .add_modifier(Modifier::BOLD))
-            .alignment(layout::Alignment::Center)
-            .block(
-                widgets::Block::default()
-                .borders(widgets::Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .title("Commands")
-                .border_type(widgets::BorderType::Plain)
+            let content = widgets::Paragraph::new(todo_items.clone())
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(layout::Alignment::Center)
+                .block(
+                    widgets::Block::default()
+                        .borders(widgets::Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .border_type(widgets::BorderType::Plain),
                 );
 
-        rec.render_widget(header, chunks[0]);
-        rec.render_widget(content, chunks[1]); 
-        rec.render_widget(command_buffer, chunks[2]);
-    }).expect("Drawing TUI");
-    Ok(()) 
+            let command_buffer = widgets::Paragraph::new(command_contents)
+                .style(
+                    Style::default()
+                        .fg(if let BufferType::Error(_) = buffer {
+                            Color::Red
+                        } else {
+                            Color::LightCyan
+                        })
+                        .add_modifier(Modifier::BOLD),
+                )
+                .alignment(layout::Alignment::Center)
+                .block(
+                    widgets::Block::default()
+                        .borders(widgets::Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .title("Commands")
+                        .border_type(widgets::BorderType::Plain),
+                );
+
+            rec.render_widget(header, chunks[0]);
+            rec.render_widget(content, chunks[1]);
+            rec.render_widget(command_buffer, chunks[2]);
+        })
+        .expect("Drawing TUI");
+    Ok(())
 }

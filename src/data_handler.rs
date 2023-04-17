@@ -1,8 +1,12 @@
 pub mod data_handler {
     use crate::todo_backend::todo::TodoList;
-    use std::{fs::File, io::{Write, Read, self}, error::Error};
+    use std::{
+        error::Error,
+        fs::File,
+        io::{self, Read, Write},
+    };
 
-    const DB_PATH: &str = "Todo_Data"; 
+    const DB_PATH: &str = "Todo_Data";
 
     pub fn load_todo_list() -> io::Result<TodoList> {
         let mut file = match File::open(DB_PATH) {
@@ -23,25 +27,24 @@ pub mod data_handler {
         let serialized_todo = serde_json::to_string(&todo_list)?;
         let mut file = File::create(DB_PATH)?;
         file.write_all(serialized_todo.as_bytes())?;
-        return Ok(())
+        return Ok(());
     }
 
     fn generate_file() -> io::Result<()> {
-        let mut file =  File::create(DB_PATH)?;
+        let mut file = File::create(DB_PATH)?;
         match file.write_all(b"{\"todo_items\":[],\"completed_items\":[]}") {
             Ok(_) => return Ok(()),
-            Err(e) => return Err(e)
+            Err(e) => return Err(e),
         }
     }
 
-    pub fn handle_data_errors(e: io::Error) -> io::Result<()>{
-        match e.kind() {  
+    pub fn handle_data_errors(e: io::Error) -> io::Result<()> {
+        match e.kind() {
             io::ErrorKind::PermissionDenied => {
                 println!("App does not have permission to access save file");
                 return Err(e);
             }
-            _ => return Err(e)
+            _ => return Err(e),
         }
     }
-
 }
