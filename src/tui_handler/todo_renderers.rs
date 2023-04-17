@@ -1,4 +1,4 @@
-use std::io::Stdout;
+use std::{io::Stdout, alloc::Layout};
 
 use tui::{
     backend::CrosstermBackend,
@@ -85,6 +85,95 @@ pub fn render_main(
 
             rec.render_widget(header, chunks[0]);
             rec.render_widget(content, chunks[1]);
+            rec.render_widget(command_buffer, chunks[2]);
+        })
+        .expect("Drawing TUI");
+    Ok(())
+}
+
+pub fn render_adding(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    buffer: &str,
+    todo_items: &String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    terminal
+        .draw(|rec| {
+            let size = rec.size();
+            let chunks = layout::Layout::default()
+                .direction(layout::Direction::Vertical)
+                .margin(2)
+                .constraints(
+                    [
+                        layout::Constraint::Length(3), //Adding
+                        layout::Constraint::Min(2),    //Content
+                        layout::Constraint::Length(3), //Footer
+                    ]
+                    .as_ref(),
+                )
+                .split(size);
+
+            let header = widgets::Paragraph::new("TODO LIST")
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(layout::Alignment::Center)
+                .block(
+                    widgets::Block::default()
+                        .borders(widgets::Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .border_type(widgets::BorderType::Plain),
+                );
+
+            let content = layout::Layout::default()
+                .direction(layout::Direction::Horizontal)
+                .margin(0)
+                .constraints([
+                    layout::Constraint::Percentage(70),
+                    layout::Constraint::Percentage(30),
+                ]
+                .as_ref(),
+                )
+                .split(chunks[1]);
+
+
+            let todos = widgets::Paragraph::new(todo_items.clone())
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(layout::Alignment::Center)
+                .block(
+                    widgets::Block::default()
+                        .borders(widgets::Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .border_type(widgets::BorderType::Plain),
+                );
+
+            let new_todo = widgets::Paragraph::new("    Task Name: ".to_owned() + buffer)
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(layout::Alignment::Left)
+                .block(
+                    widgets::Block::default()
+                        .borders(widgets::Borders::ALL)
+                        .style(Style::default().fg(Color::LightGreen))
+                        .title("New Task")
+                        .border_type(widgets::BorderType::Thick),
+                );
+
+
+            let command_buffer = widgets::Paragraph::new("Adding Task")
+                .style(
+                    Style::default()
+                        .fg(Color::LightCyan)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .alignment(layout::Alignment::Center)
+                .block(
+                    widgets::Block::default()
+                        .borders(widgets::Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .title("Commands")
+                        .border_type(widgets::BorderType::Plain),
+                );
+
+            rec.render_widget(header, chunks[0]);
+            rec.render_widget(todos, content[0]);
+            rec.render_widget(new_todo, content[1]);
             rec.render_widget(command_buffer, chunks[2]);
         })
         .expect("Drawing TUI");

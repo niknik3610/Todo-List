@@ -166,21 +166,21 @@ pub mod tui_handler {
                 let mut current_state_data = current_state.lock().unwrap();
                 match *current_state_data {
                     State::Viewing => render_main(&mut terminal, BufferType::None, &todo_items)?,
-                    State::AddingTodo => render_main(
+                    State::AddingTodo => render_adding(
                         &mut terminal,
-                        BufferType::AddingTask(&output_buffer),
+                        output_buffer.as_str(),
                         &todo_items,
-                    )?,
+                        )?,
                     State::CompletingTodo => render_main(
                         &mut terminal,
                         BufferType::CompletingTask(&output_buffer),
                         &todo_items,
-                    )?,
+                        )?,
                     State::UncompletingTodo => render_main(
                         &mut terminal,
                         BufferType::UncompletingTask(&output_buffer),
                         &todo_items,
-                    )?,
+                        )?,
                     State::Error => *current_state_data = State::Viewing,
                     State::Quitting => {
                         disable_raw_mode().unwrap();
