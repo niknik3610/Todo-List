@@ -8,7 +8,6 @@ pub mod tui_handler {
     use crossterm::terminal::LeaveAlternateScreen;
     use crossterm::terminal::{self as cTerm, disable_raw_mode, enable_raw_mode};
     use std::convert::From;
-    use std::error::Error;
     use std::io::stdout;
     use std::io::ErrorKind;
     use std::io::Stdout;
@@ -60,47 +59,48 @@ pub mod tui_handler {
         execute!(stdout(), cTerm::EnterAlternateScreen).unwrap();
 
         let current_state = Arc::new(Mutex::new(State::Viewing));
-        let current_state_input = current_state.clone();
 
         let (sx, rx) = channel();
         let mut threads = Vec::new();
 
-        threads.push(thread::spawn(move || {
-            let mut current_tick_time = Instant::now();
-            loop {
-                {
-                    //if panic I don't know how to recover
-                    let current_state_data = current_state_input.lock().unwrap();
-                    if let State::Quitting = *current_state_data {
+        {
+            let current_state = current_state.clone();
+            threads.push(thread::spawn(move || {
+                let mut current_tick_time = Instant::now();
+                loop {
+                    let current_state = current_state.lock().unwrap();
+
+                    if let State::Quitting = *current_state {
                         break;
                     }
+                    drop(current_state);
+                    capture_input(&sx, &mut current_tick_time).expect("Input handler crashed");
                 }
-                capture_input(&sx, &mut current_tick_time).expect("Input handler crashed");
-            }
-        }));
-
-        match tui_handler(&rx, current_state, todo_list) {
-            Ok(_) => {}
-            Err(e) => {
-                disable_raw_mode().unwrap();
-                eprintln!("{:?}", e);
-                panic!();
-            }
+            }));
         }
+
+        if let Err(e) = tui_handler(&rx, &current_state, todo_list) { 
+            eprintln!("{:?}", e);
+
+            let mut current_state = current_state.lock().unwrap();
+            *current_state = State::Quitting;
+        }
+
         threads
             .into_iter()
             .for_each(|thread| thread.join().unwrap());
-
+        
+        disable_raw_mode().unwrap();
         execute!(stdout(), LeaveAlternateScreen).unwrap();
         return Ok(());
     }
 
     fn tui_handler(
         rx: &Receiver<Event<CEvent::KeyEvent>>,
-        current_state: Arc<Mutex<State>>,
+        current_state: &Arc<Mutex<State>>,
         todo: &mut TodoList,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut output_buffer = String::from("");
+        ) -> Result<(), Box<dyn std::error::Error>> { 
+        let mut user_input_buffer = String::from("");
         let mut todo_items = generate_todo(todo);
 
         let stdout = io::stdout();
@@ -130,27 +130,24 @@ pub mod tui_handler {
                 match result {
                     UserAction::View => {
                         *current_state_data = State::Viewing;
-                        output_buffer = String::new();
+                        user_input_buffer = String::new();
                     }
-                    UserAction::Input(input) => output_buffer.push(input),
+                    UserAction::Input(input) => user_input_buffer.push(input),
                     //handles user buffer input
                     UserAction::SubmitBuffer => {
-                        match submit_buffer(&current_state_data, &output_buffer[..], todo) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                handle_errors(e, &mut terminal, &todo_items)?;
-                                *current_state_data = State::Viewing;
-                                output_buffer = String::new();
-                                continue;
-                            }
+                        if let Err(e) = submit_buffer(&current_state_data, &user_input_buffer[..], todo) {
+                            handle_errors(e, &mut terminal, &todo_items)?;
+                            *current_state_data = State::Viewing;
+                            user_input_buffer = String::new();
+                            continue;
                         }
 
                         *current_state_data = State::Viewing;
                         todo_items = generate_todo(todo);
-                        output_buffer = String::from("");
+                        user_input_buffer = String::from("");
                     }
                     UserAction::Backspace => {
-                        output_buffer.pop();
+                        user_input_buffer.pop();
                     }
                     //just change the state depending on user action
                     UserAction::Quit => *current_state_data = State::Quitting,
@@ -168,22 +165,21 @@ pub mod tui_handler {
                     State::Viewing => render_main(&mut terminal, BufferType::None, &todo_items)?,
                     State::AddingTodo => render_adding(
                         &mut terminal,
-                        output_buffer.as_str(),
+                        user_input_buffer.as_str(),
                         &todo_items,
                         )?,
                     State::CompletingTodo => render_main(
                         &mut terminal,
-                        BufferType::CompletingTask(&output_buffer),
+                        BufferType::CompletingTask(&user_input_buffer),
                         &todo_items,
                         )?,
                     State::UncompletingTodo => render_main(
                         &mut terminal,
-                        BufferType::UncompletingTask(&output_buffer),
+                        BufferType::UncompletingTask(&user_input_buffer),
                         &todo_items,
                         )?,
                     State::Error => *current_state_data = State::Viewing,
                     State::Quitting => {
-                        disable_raw_mode().unwrap();
                         return Ok(());
                     }
                 }

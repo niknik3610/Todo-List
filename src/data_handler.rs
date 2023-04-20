@@ -9,13 +9,11 @@ pub mod data_handler {
     const DB_PATH: &str = "Todo_Data";
 
     pub fn load_todo_list() -> io::Result<TodoList> {
-        let mut file = match File::open(DB_PATH) {
-            Ok(r) => r,
-            Err(_) => {
-                generate_file()?;
-                File::open(DB_PATH)?
-            }
-        };
+        let mut file = File::open(DB_PATH).unwrap_or_else(|_|{
+            generate_file().expect("Failed to Create Save File");
+            File::open(DB_PATH).expect("Failed to Open Save File")
+        });
+
         let mut file_contents = String::new();
         file.read_to_string(&mut file_contents)?;
 
@@ -37,7 +35,7 @@ pub mod data_handler {
             Err(e) => return Err(e),
         }
     }
-
+    
     pub fn handle_data_errors(e: io::Error) -> io::Result<()> {
         match e.kind() {
             io::ErrorKind::PermissionDenied => {
