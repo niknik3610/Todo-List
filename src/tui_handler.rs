@@ -3,6 +3,9 @@ pub mod tui_handler {
     use crate::todo_backend::todo::TodoList;
     use crate::tui_handler::todo_renderers::*;
 
+    use chrono::TimeZone;
+    use chrono::Utc;
+    use chrono::format::format;
     use crossterm::event as CEvent;
     use crossterm::execute;
     use crossterm::terminal::LeaveAlternateScreen;
@@ -250,19 +253,37 @@ pub mod tui_handler {
 
     fn generate_todo(todo: &TodoList) -> String {
         let mut todo_str = String::from("Todo:\n");
+        let time_now = chrono::offset::Local::now();
+        let mut timer: [i64; 3] = [0, 0, 0];
+
         todo.todo_items
             .iter()
             .enumerate()
             .for_each(|(index, item)| {
                 todo_str.push_str(&format!(
-                    "{index} - {item_name} [{completed}]\n",
+                    "{index} - {item_name} [{completed}]",
                     item_name = item.title,
                     completed = if !item.completed {
                         COMPLETED_ITEM[0]
                     } else {
                         COMPLETED_ITEM[1]
-                    }
+                    } 
                 ));
+
+                if let Some(due) = item.due_date {
+                    let due_duration = due.signed_duration_since(time_now).num_seconds();
+                    timer = [
+                        (due_duration / 60) % 60,       //mins
+                        (due_duration / 60) / 60,       //hrs
+                        (due_duration / 60) / 60 / 24   //days
+                            ];
+                    todo_str.push_str(&format!(" | Due: {d:0>2}:{h:0>2}:{m:0>2}",
+                                               d = timer[2],
+                                               h = timer[1],
+                                               m = timer[0],
+                                               ));
+                }
+                todo_str.push_str("\n");
             });
 
         todo_str.push_str("\n\nCompleted Todos:\n");

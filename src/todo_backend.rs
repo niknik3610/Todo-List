@@ -2,7 +2,11 @@ pub mod todo {
     use core::fmt;
     use serde::{Deserialize, Serialize};
     use std::{error::Error, io::Result as ResultIo};
-    use std::{io::ErrorKind, vec::Vec};
+    use std::{
+        io::ErrorKind,
+        vec::Vec,
+    };
+    use chrono::{DateTime, TimeZone, Local, NaiveDateTime, Offset};
 
     #[derive(Debug)]
     pub enum TodoError {
@@ -33,7 +37,16 @@ pub mod todo {
             }
         }
         pub fn add_item(&mut self, item_title: &str) -> ResultIo<usize> {
-            self.todo_items.push(TodoItem::new(item_title.to_string()));
+            let time =chrono::offset::Local::now();
+            let date = match Local::with_ymd_and_hms(&time.timezone(), 2023, 04, 22, 01, 01, 01) {
+                chrono::LocalResult::Single(r) => r,
+                _ => return Err(ErrorKind::InvalidData.into())
+            };
+            self.todo_items.push(
+                TodoItem::new(
+                    item_title.to_string(), 
+                    Some(date))
+            );
             return Ok(self.todo_items.len() - 1);
         }
         pub fn complete_item(&mut self, item_id: usize) -> ResultIo<()> {
@@ -81,12 +94,14 @@ pub mod todo {
     pub struct TodoItem {
         pub title: String,
         pub completed: bool,
+        pub due_date: Option<DateTime<Local>>,
     }
     impl TodoItem {
-        fn new(item_title: String) -> TodoItem {
+        fn new(item_title: String, due_date: Option<DateTime<Local>>) -> TodoItem {
             TodoItem {
                 title: item_title,
                 completed: false,
+                due_date,
             }
         }
         pub fn print(&self) {
