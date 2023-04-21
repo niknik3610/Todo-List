@@ -44,10 +44,7 @@ pub mod todo {
             self.completed_items.push(self.todo_items.remove(item_id));
             return Ok(());
         }
-        pub fn uncomplete_item(&mut self, item_id: usize) -> ResultIo<()> {
-            if item_id > self.todo_items.len() - 1 {
-                return Err(ErrorKind::InvalidInput.into());
-            }
+        pub fn uncomplete_item(&mut self, item_id: usize) -> ResultIo<()> { 
             self.completed_items[item_id].completed = false;
             self.todo_items.push(self.completed_items.remove(item_id));
             return Ok(());
@@ -71,6 +68,12 @@ pub mod todo {
                 Some((id, _)) => Some(id),
                 None => None,
             }
+        }
+        pub fn todo_len(&self) -> usize {
+            return self.todo_items.len();
+        }
+        pub fn completed_len(&self) -> usize {
+            return self.completed_items.len();
         }
     }
 

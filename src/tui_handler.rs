@@ -22,7 +22,7 @@ pub mod tui_handler {
     use tui::backend::CrosstermBackend;
     use tui::Terminal;
 
-    const TICK_RATE: Duration = Duration::from_millis(200);
+    const MAX_TICK_TIME: Duration = Duration::from_millis(200);
     const COMPLETED_ITEM: [char; 2] = [' ', 'X'];
 
     type ResultIo<T> = Result<T, io::Error>;
@@ -63,6 +63,7 @@ pub mod tui_handler {
         let (sx, rx) = channel();
         let mut threads = Vec::new();
 
+        //input thread and loop 
         {
             let current_state = current_state.clone();
             threads.push(thread::spawn(move || {
@@ -78,8 +79,11 @@ pub mod tui_handler {
                 }
             }));
         }
+        
+        let tui_result = tui_loop(&rx, &current_state, todo_list);
 
-        if let Err(e) = tui_handler(&rx, &current_state, todo_list) { 
+        //exits gracefully on error
+        if let Err(e) = tui_result { 
             eprintln!("{:?}", e);
 
             let mut current_state = current_state.lock().unwrap();
@@ -95,7 +99,7 @@ pub mod tui_handler {
         return Ok(());
     }
 
-    fn tui_handler(
+    fn tui_loop(
         rx: &Receiver<Event<CEvent::KeyEvent>>,
         current_state: &Arc<Mutex<State>>,
         todo: &mut TodoList,
@@ -191,7 +195,7 @@ pub mod tui_handler {
         sx: &Sender<Event<CEvent::KeyEvent>>,
         current_tick_time: &mut Instant,
     ) -> ResultIo<()> {
-        let event_timer = TICK_RATE
+        let event_timer = MAX_TICK_TIME
             .checked_sub(current_tick_time.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
 
@@ -201,7 +205,7 @@ pub mod tui_handler {
             }
         }
 
-        if current_tick_time.elapsed() >= TICK_RATE {
+        if current_tick_time.elapsed() >= MAX_TICK_TIME {
             match sx.send(Event::Tick) {
                 Ok(_) => *current_tick_time = Instant::now(),
                 Err(e) => eprintln!("{e}"),
@@ -285,24 +289,32 @@ pub mod tui_handler {
         output_buffer: &str,
         todo: &mut TodoList,
     ) -> ResultIo<()> {
+        if let State::AddingTodo = *current_state_data { 
+            todo.add_item(&output_buffer)?;
+            return Ok(());
+        }
+        
+        let output_buffer = match output_buffer.parse::<usize>() {
+            Ok(r) => r,
+            Err(_) => return Err(ErrorKind::InvalidInput.into())
+        }; 
+
         match *current_state_data {
-            State::AddingTodo => {
-                todo.add_item(&output_buffer)?;
-            }
             State::CompletingTodo => {
-                todo.complete_item(match output_buffer.parse::<usize>() {
-                    Ok(r) => r,
-                    Err(_) => return Err(ErrorKind::InvalidInput.into()),
-                })?;
-            }
+                if output_buffer > todo.todo_len() - 1 {
+                    return Err(ErrorKind::InvalidInput.into());
+                }
+                todo.complete_item(output_buffer)?;
+            },
             State::UncompletingTodo => {
-                todo.uncomplete_item(match output_buffer.parse::<usize>() {
-                    Ok(r) => r,
-                    Err(_) => return Err(ErrorKind::InvalidInput.into()),
-                })?;
+                if output_buffer > todo.completed_len() - 1 {
+                    return Err(ErrorKind::InvalidInput.into());
+                }
+                todo.uncomplete_item(output_buffer)?;
             }
             _ => {}
         }
+
         return Ok(());
     }
 
@@ -315,6 +327,10 @@ pub mod tui_handler {
         match e.kind() {
             InvalidInput => {
                 render_main(terminal, BufferType::Error("Invalid Input"), todo_items).unwrap();
+                return Ok(());
+            }
+            InvalidData => { 
+                render_main(terminal, BufferType::Error("Invalid or Empty Data"), todo_items).unwrap();
                 return Ok(());
             }
             _ => return Err(e),
