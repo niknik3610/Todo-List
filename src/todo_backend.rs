@@ -1,4 +1,5 @@
 pub mod todo {
+    #[allow(dead_code, un)]
     use core::fmt;
     use serde::{Deserialize, Serialize};
     use std::{error::Error, io::Result as ResultIo};
@@ -6,7 +7,7 @@ pub mod todo {
         io::ErrorKind,
         vec::Vec,
     };
-    use chrono::{DateTime, TimeZone, Local, NaiveDateTime, Offset};
+    use chrono::{DateTime, TimeZone, Local, NaiveDateTime, Offset, FixedOffset, Date};
 
     #[derive(Debug)]
     pub enum TodoError {
@@ -38,10 +39,18 @@ pub mod todo {
         }
         pub fn add_item(&mut self, item_title: &str) -> ResultIo<usize> {
             let time =chrono::offset::Local::now();
+            
+            let date = match NaiveDateTime::parse_from_str(
+                "2023 May 10, 10:10:10", "%Y %b %d, %H:%M:%S") {
+                Ok(r) => r,
+                Err(e) => return Err(std::io::ErrorKind::Unsupported.into()),
+            };
+            /*
             let date = match Local::with_ymd_and_hms(&time.timezone(), 2023, 04, 22, 01, 01, 01) {
                 chrono::LocalResult::Single(r) => r,
                 _ => return Err(ErrorKind::InvalidData.into())
             };
+            */
             self.todo_items.push(
                 TodoItem::new(
                     item_title.to_string(), 
@@ -94,10 +103,10 @@ pub mod todo {
     pub struct TodoItem {
         pub title: String,
         pub completed: bool,
-        pub due_date: Option<DateTime<Local>>,
+        pub due_date: Option<NaiveDateTime>,
     }
     impl TodoItem {
-        fn new(item_title: String, due_date: Option<DateTime<Local>>) -> TodoItem {
+        fn new(item_title: String, due_date: Option<NaiveDateTime>) -> TodoItem {
             TodoItem {
                 title: item_title,
                 completed: false,

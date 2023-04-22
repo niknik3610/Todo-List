@@ -113,7 +113,7 @@ pub mod tui_handler {
         todo: &mut TodoList,
         ) -> Result<(), Box<dyn std::error::Error>> { 
         let mut user_input_buffer = String::from("");
-        let mut temp_todo_item = ("", "");
+        let mut temp_task_name = "";  
         let mut todo_items = generate_todo(todo);
 
         let stdout = io::stdout();
@@ -286,7 +286,7 @@ pub mod tui_handler {
                 ));
 
                 if let Some(due) = item.due_date {
-                    let due_duration = due.signed_duration_since(time_now).num_seconds();
+                    let due_duration = due.signed_duration_since(time_now.naive_utc()).num_seconds();
                     timer = [
                         (due_duration / 60) % 60,       //mins
                         (due_duration / 60) / 60,       //hrs
