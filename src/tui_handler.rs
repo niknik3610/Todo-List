@@ -34,7 +34,7 @@ pub mod tui_handler {
     enum State {
         Viewing,
         Quitting,
-        AddingTodo,
+        AddingTodo(AddState),
         CompletingTodo,
         UncompletingTodo,
         Error,
@@ -55,8 +55,9 @@ pub mod tui_handler {
         Backspace,
         ExitBuffer,
     }
-
-    enum AddState {
+    
+    #[derive(Copy, Clone)] 
+    pub enum AddState {
         EnteringName,
         EnteringDate
     }
@@ -112,6 +113,7 @@ pub mod tui_handler {
         todo: &mut TodoList,
         ) -> Result<(), Box<dyn std::error::Error>> { 
         let mut user_input_buffer = String::from("");
+        let mut temp_todo_item = ("", "");
         let mut todo_items = generate_todo(todo);
 
         let stdout = io::stdout();
@@ -141,7 +143,7 @@ pub mod tui_handler {
                 match result { 
                     //just change the state depending on user action
                     UserAction::Quit => *current_state_data = State::Quitting,
-                    UserAction::AddTodo => *current_state_data = State::AddingTodo,
+                    UserAction::AddTodo => *current_state_data = State::AddingTodo(AddState::EnteringName),
                     UserAction::CompeleteTodo => *current_state_data = State::CompletingTodo,
                     UserAction::UncompleteTodo => *current_state_data = State::UncompletingTodo,
                     UserAction::None => continue,
@@ -149,7 +151,8 @@ pub mod tui_handler {
                         match action {
                             BufferAction::Input(input) => user_input_buffer.push(input),
                             BufferAction::SubmitBuffer => {
-                                let submit_result = submit_buffer(&current_state_data, &user_input_buffer[..], todo);
+                                let submit_result = 
+                                    submit_buffer(&current_state_data, &user_input_buffer[..], todo);
 
                                 if let Err(e) = submit_result {
                                     handle_errors(e, &mut terminal, &todo_items)?;
@@ -177,13 +180,14 @@ pub mod tui_handler {
 
             //render the correct state
             {
-                let mut current_state_data = current_state.lock().unwrap();
-                match *current_state_data {
+                let mut current_state = current_state.lock().unwrap();
+                match *current_state {
                     State::Viewing => render_main(&mut terminal, BufferType::None, &todo_items)?,
-                    State::AddingTodo => render_adding(
+                    State::AddingTodo(state) => render_adding(
                         &mut terminal,
                         user_input_buffer.as_str(),
                         &todo_items,
+                        state,
                         )?,
                     State::CompletingTodo => render_main(
                         &mut terminal,
@@ -195,7 +199,7 @@ pub mod tui_handler {
                         BufferType::UncompletingTask(&user_input_buffer),
                         &todo_items,
                         )?,
-                    State::Error => *current_state_data = State::Viewing,
+                    State::Error => *current_state = State::Viewing,
                     State::Quitting => {
                         return Ok(());
                     }
@@ -321,7 +325,7 @@ pub mod tui_handler {
         output_buffer: &str,
         todo: &mut TodoList,
     ) -> ResultIo<()> {
-        if let State::AddingTodo = *current_state_data { 
+        if let State::AddingTodo(_) = *current_state_data { 
             todo.add_item(&output_buffer)?;
             return Ok(());
         }

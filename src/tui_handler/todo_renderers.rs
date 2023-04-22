@@ -7,6 +7,8 @@ use tui::{
     widgets, Terminal,
 };
 
+use super::tui_handler::AddState;
+
 pub enum BufferType<'a> {
     None,
     AddingTask(&'a str),
@@ -95,6 +97,7 @@ pub fn render_adding(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     buffer: &str,
     todo_items: &String,
+    adding_state: AddState
 ) -> Result<(), Box<dyn std::error::Error>> {
     terminal
         .draw(|rec| {
