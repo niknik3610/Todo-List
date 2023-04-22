@@ -2,10 +2,6 @@ mod todo_renderers;
 pub mod tui_handler {
     use crate::todo_backend::todo::TodoList;
     use crate::tui_handler::todo_renderers::*;
-
-    use chrono::TimeZone;
-    use chrono::Utc;
-    use chrono::format::format;
     use crossterm::event as CEvent;
     use crossterm::execute;
     use crossterm::terminal::LeaveAlternateScreen;
@@ -45,16 +41,24 @@ pub mod tui_handler {
     }
 
     enum UserAction {
-        View,
         Quit,
         AddTodo,
         CompeleteTodo,
         UncompleteTodo,
-        //input Actions
+        ManipulateBuffer(BufferAction),
+        None,
+    }
+
+    enum BufferAction {
         Input(char),
         SubmitBuffer,
         Backspace,
-        None,
+        ExitBuffer,
+    }
+
+    enum AddState {
+        EnteringName,
+        EnteringDate
     }
 
     pub fn run_tui(todo_list: &mut TodoList) -> ResultIo<()> {
@@ -134,34 +138,40 @@ pub mod tui_handler {
                     }
                 };
 
-                match result {
-                    UserAction::View => {
-                        *current_state_data = State::Viewing;
-                        user_input_buffer = String::new();
-                    }
-                    UserAction::Input(input) => user_input_buffer.push(input),
-                    //handles user buffer input
-                    UserAction::SubmitBuffer => {
-                        if let Err(e) = submit_buffer(&current_state_data, &user_input_buffer[..], todo) {
-                            handle_errors(e, &mut terminal, &todo_items)?;
-                            *current_state_data = State::Viewing;
-                            user_input_buffer = String::new();
-                            continue;
-                        }
-
-                        *current_state_data = State::Viewing;
-                        todo_items = generate_todo(todo);
-                        user_input_buffer = String::from("");
-                    }
-                    UserAction::Backspace => {
-                        user_input_buffer.pop();
-                    }
+                match result { 
                     //just change the state depending on user action
                     UserAction::Quit => *current_state_data = State::Quitting,
                     UserAction::AddTodo => *current_state_data = State::AddingTodo,
                     UserAction::CompeleteTodo => *current_state_data = State::CompletingTodo,
                     UserAction::UncompleteTodo => *current_state_data = State::UncompletingTodo,
                     UserAction::None => continue,
+                    UserAction::ManipulateBuffer(action) => {
+                        match action {
+                            BufferAction::Input(input) => user_input_buffer.push(input),
+                            BufferAction::SubmitBuffer => {
+                                let submit_result = submit_buffer(&current_state_data, &user_input_buffer[..], todo);
+
+                                if let Err(e) = submit_result {
+                                    handle_errors(e, &mut terminal, &todo_items)?;
+                                    *current_state_data = State::Viewing;
+                                    user_input_buffer = String::new();
+                                    continue;
+                                }
+
+                                *current_state_data = State::Viewing;
+                                todo_items = generate_todo(todo);
+                                user_input_buffer = String::from("");
+                            } 
+                            BufferAction::Backspace => {
+                                user_input_buffer.pop();
+                            }
+                            BufferAction::ExitBuffer => {
+                                *current_state_data = State::Viewing;
+                                user_input_buffer = String::new();
+
+                            }
+                        }
+                    }, 
                 }
             }
 
@@ -242,11 +252,12 @@ pub mod tui_handler {
         }
 
         //handles user actions when in buffer mode
+        use BufferAction::*;
         match input.code {
-            KeyCode::Char(input) => return Ok(UserAction::Input(input)),
-            KeyCode::Backspace => return Ok(UserAction::Backspace),
-            KeyCode::Enter => return Ok(UserAction::SubmitBuffer),
-            KeyCode::Esc => return Ok(UserAction::View),
+            KeyCode::Char(input) => return Ok(UserAction::ManipulateBuffer(Input(input))),
+            KeyCode::Backspace => return Ok(UserAction::ManipulateBuffer(Backspace)),
+            KeyCode::Enter => return Ok(UserAction::ManipulateBuffer(SubmitBuffer)),
+            KeyCode::Esc => return Ok(UserAction::ManipulateBuffer(ExitBuffer)),
             _ => return Ok(UserAction::None),
         };
     }
