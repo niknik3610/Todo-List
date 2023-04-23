@@ -89,7 +89,6 @@ pub mod tui_handler {
         }
         
         let tui_result = tui_loop(&rx, &current_state, todo_list);
-
         //exits gracefully on error
         if let Err(e) = tui_result { 
             eprintln!("{:?}", e);
@@ -292,11 +291,13 @@ pub mod tui_handler {
                         (due_duration / 60) / 60,       //hrs
                         (due_duration / 60) / 60 / 24   //days
                             ];
-                    todo_str.push_str(&format!(" | Due: {d:0>2}:{h:0>2}:{m:0>2}",
+                    todo_str.push_str(&format!(" | {:?} ", item.due_date));
+                    /*
+                    Due: {d:0>2}:{h:0>2}:{m:0>2}",
                                                d = timer[2],
                                                h = timer[1],
                                                m = timer[0],
-                                               ));
+                                               */
                 }
                 todo_str.push_str("\n");
             });

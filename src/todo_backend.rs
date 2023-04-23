@@ -38,12 +38,12 @@ pub mod todo {
             }
         }
         pub fn add_item(&mut self, item_title: &str) -> ResultIo<usize> {
-            let time =chrono::offset::Local::now();
+            let time = chrono::offset::Local::now();
             
             let date = match NaiveDateTime::parse_from_str(
-                "2023 May 10, 10:10:10", "%Y %b %d, %H:%M:%S") {
+                "2023 April 23, 12:0:0", "%Y %b %d, %H:%M:%S") {
                 Ok(r) => r,
-                Err(e) => return Err(std::io::ErrorKind::Unsupported.into()),
+                Err(_) => return Err(std::io::ErrorKind::Unsupported.into()),   
             };
             /*
             let date = match Local::with_ymd_and_hms(&time.timezone(), 2023, 04, 22, 01, 01, 01) {
