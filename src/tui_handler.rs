@@ -112,7 +112,7 @@ pub mod tui_handler {
         todo: &mut TodoList,
         ) -> Result<(), Box<dyn std::error::Error>> { 
         let mut user_input_buffer = String::from("");
-        let task_name = "";  
+        let mut storage_buff = "".to_string();  
         let mut todo_items = generate_todo(todo);
 
         let stdout = io::stdout();
@@ -150,24 +150,28 @@ pub mod tui_handler {
                         match action {
                             BufferAction::Input(input) => user_input_buffer.push(input),
                             BufferAction::SubmitBuffer => {
-                                let submit_result = match *current_state_data {
-                                    State::AddingTodo(AddState::EnteringDate) => 
-                                        submit_buffer(&current_state_data, &user_input_buffer[..], todo, Some(task_name)),
-                                    
-                                    _ => 
-                                        submit_buffer(&current_state_data, &user_input_buffer[..], todo, None),
+                                 match *current_state_data {
+                                    State::AddingTodo(AddState::EnteringName) => {
+                                        swap_buffers(&user_input_buffer, &mut storage_buff)?;
+                                        user_input_buffer = String::new(); 
+                                        *current_state_data = State::AddingTodo(AddState::EnteringDate);
+                                    }, 
+                                    _ => { 
+                                        let submit_result = 
+                                            submit_buffer(&current_state_data, &*user_input_buffer, storage_buff.clone(), todo); 
+
+                                        *current_state_data = State::Viewing;
+                                        todo_items = generate_todo(todo);
+                                        user_input_buffer = String::from("");
+
+                                        if let Err(e) = submit_result {
+                                            handle_errors(e, &mut terminal, &todo_items)?;
+                                            *current_state_data = State::Viewing;
+                                            user_input_buffer = String::new();
+                                            continue;
+                                        }
+                                    }
                                 };
-
-                                if let Err(e) = submit_result {
-                                    handle_errors(e, &mut terminal, &todo_items)?;
-                                    *current_state_data = State::Viewing;
-                                    user_input_buffer = String::new();
-                                    continue;
-                                }
-
-                                *current_state_data = State::Viewing;
-                                todo_items = generate_todo(todo);
-                                user_input_buffer = String::from("");
                             } 
                             BufferAction::Backspace => {
                                 user_input_buffer.pop();
@@ -175,7 +179,6 @@ pub mod tui_handler {
                             BufferAction::ExitBuffer => {
                                 *current_state_data = State::Viewing;
                                 user_input_buffer = String::new();
-
                             }
                         }
                     }, 
@@ -187,20 +190,23 @@ pub mod tui_handler {
                 let mut current_state = current_state.lock().unwrap();
                 match *current_state {
                     State::Viewing => render_main(&mut terminal, BufferType::None, &todo_items)?,
-                    State::AddingTodo(state) if matches!(AddState::EnteringName, state) => render_adding(
-                        &mut terminal,
-                        user_input_buffer.as_str(),
-                        "",
-                        &todo_items,
-                        state,
-                        )?,
-                    State::AddingTodo(state) =>  render_adding(
-                        &mut terminal,
-                        task_name,
-                        user_input_buffer.as_str(),
-                        &todo_items,
-                        state,
-                        )?,
+                    State::AddingTodo(state)  => {
+                        use AddState::*;
+                        match state {
+                            EnteringName => render_adding(
+                                &mut terminal,
+                                user_input_buffer.as_str(),
+                                "",
+                                &todo_items,
+                                )?,
+                            EnteringDate => render_adding(
+                                &mut terminal,
+                                &storage_buff[..],
+                                user_input_buffer.as_str(),
+                                &todo_items,
+                                )?,
+                        }
+                    },
                     State::CompletingTodo => render_main(
                         &mut terminal,
                         BufferType::CompletingTask(&user_input_buffer),
@@ -337,11 +343,15 @@ pub mod tui_handler {
     fn submit_buffer(
         current_state_data: &State,
         output_buffer: &str,
+        storage_buff: String,
         todo: &mut TodoList,
-        task_name: Option<&str>
-    ) -> ResultIo<()> {
-        if let State::AddingTodo(_) = *current_state_data { 
-            todo.add_item_with_date(&output_buffer, "2023 May 24, 16:00:00")?;
+    ) -> ResultIo<()> { 
+        if let State::AddingTodo(state) = *current_state_data { 
+            match state {
+                AddState::EnteringName => todo.add_item(&output_buffer)?,
+                AddState::EnteringDate => 
+                    todo.add_item_with_date(&output_buffer, &*storage_buff)?
+            };
             return Ok(());
         }
         
@@ -367,6 +377,11 @@ pub mod tui_handler {
         }
 
         return Ok(());
+    }
+
+    fn swap_buffers(prev_buff: &str, storage_buff: &mut String) -> ResultIo<()> {
+        *storage_buff = prev_buff.to_string();
+        return Ok(())
     }
 
     fn handle_errors(

@@ -98,7 +98,6 @@ pub fn render_adding(
     name_buffer: &str,
     date_buffer: &str,
     todo_items: &String,
-    _adding_state: AddState
 ) -> Result<(), Box<dyn std::error::Error>> {
     terminal
         .draw(|rec| {
