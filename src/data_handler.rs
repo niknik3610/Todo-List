@@ -1,7 +1,6 @@
 pub mod data_handler {
     use crate::todo_backend::todo::TodoList;
     use std::{
-        error::Error,
         fs::File,
         io::{self, Read, Write},
     };

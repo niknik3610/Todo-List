@@ -1,4 +1,4 @@
-use std::{io::Stdout, alloc::Layout};
+use std::{io::Stdout};
 
 use tui::{
     backend::CrosstermBackend,
@@ -97,7 +97,7 @@ pub fn render_adding(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     buffer: &str,
     todo_items: &String,
-    adding_state: AddState
+    _adding_state: AddState
 ) -> Result<(), Box<dyn std::error::Error>> {
     terminal
         .draw(|rec| {

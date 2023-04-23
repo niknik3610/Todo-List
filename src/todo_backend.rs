@@ -7,7 +7,7 @@ pub mod todo {
         io::ErrorKind,
         vec::Vec,
     };
-    use chrono::{DateTime, TimeZone, Local, NaiveDateTime, Offset, FixedOffset, Date};
+    use chrono::{NaiveDateTime};
 
     #[derive(Debug)]
     pub enum TodoError {
@@ -38,7 +38,7 @@ pub mod todo {
             }
         }
         pub fn add_item(&mut self, item_title: &str) -> ResultIo<usize> {
-            let time = chrono::offset::Local::now();
+            let _time = chrono::offset::Local::now();
             
             let date = match NaiveDateTime::parse_from_str(
                 "2023 April 23, 12:0:0", "%Y %b %d, %H:%M:%S") {
@@ -85,7 +85,7 @@ pub mod todo {
                 .todo_items
                 .iter()
                 .enumerate()
-                .find(|(index, item)| item.title == item_title)
+                .find(|(_index, item)| item.title == item_title)
             {
                 Some((id, _)) => Some(id),
                 None => None,
