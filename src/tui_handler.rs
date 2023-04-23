@@ -59,7 +59,7 @@ pub mod tui_handler {
     #[derive(Copy, Clone)] 
     pub enum AddState {
         EnteringName,
-        EnteringDate
+        EnteringDate,
     }
 
     pub fn run_tui(todo_list: &mut TodoList) -> ResultIo<()> {
@@ -112,7 +112,7 @@ pub mod tui_handler {
         todo: &mut TodoList,
         ) -> Result<(), Box<dyn std::error::Error>> { 
         let mut user_input_buffer = String::from("");
-        let _temp_task_name = "";  
+        let task_name = "";  
         let mut todo_items = generate_todo(todo);
 
         let stdout = io::stdout();
@@ -150,8 +150,13 @@ pub mod tui_handler {
                         match action {
                             BufferAction::Input(input) => user_input_buffer.push(input),
                             BufferAction::SubmitBuffer => {
-                                let submit_result = 
-                                    submit_buffer(&current_state_data, &user_input_buffer[..], todo);
+                                let submit_result = match *current_state_data {
+                                    State::AddingTodo(AddState::EnteringDate) => 
+                                        submit_buffer(&current_state_data, &user_input_buffer[..], todo, Some(task_name)),
+                                    
+                                    _ => 
+                                        submit_buffer(&current_state_data, &user_input_buffer[..], todo, None),
+                                };
 
                                 if let Err(e) = submit_result {
                                     handle_errors(e, &mut terminal, &todo_items)?;
@@ -182,8 +187,16 @@ pub mod tui_handler {
                 let mut current_state = current_state.lock().unwrap();
                 match *current_state {
                     State::Viewing => render_main(&mut terminal, BufferType::None, &todo_items)?,
-                    State::AddingTodo(state) => render_adding(
+                    State::AddingTodo(state) if matches!(AddState::EnteringName, state) => render_adding(
                         &mut terminal,
+                        user_input_buffer.as_str(),
+                        "",
+                        &todo_items,
+                        state,
+                        )?,
+                    State::AddingTodo(state) =>  render_adding(
+                        &mut terminal,
+                        task_name,
                         user_input_buffer.as_str(),
                         &todo_items,
                         state,
@@ -285,19 +298,19 @@ pub mod tui_handler {
                 ));
 
                 if let Some(due) = item.due_date {
-                    let due_duration = due.signed_duration_since(time_now.naive_utc()).num_seconds();
+                    let due_duration = due.signed_duration_since(time_now.naive_local()).num_seconds();
                     timer = [
                         (due_duration / 60) % 60,       //mins
-                        (due_duration / 60) / 60,       //hrs
+                        (due_duration / 60) / 60 % 24,  //hrs
                         (due_duration / 60) / 60 / 24   //days
                             ];
-                    todo_str.push_str(&format!(" | {:?} ", item.due_date));
-                    /*
-                    Due: {d:0>2}:{h:0>2}:{m:0>2}",
+                    todo_str.push_str(&format!(" | Due: D:{d:0>2} H:{h:0>2} M:{m:0>2}",
                                                d = timer[2],
                                                h = timer[1],
                                                m = timer[0],
-                                               */
+                                               ));
+                                               
+                    //todo_str.push_str(&format!(" | Due: {:?}", due_duration));
                 }
                 todo_str.push_str("\n");
             });
@@ -325,9 +338,10 @@ pub mod tui_handler {
         current_state_data: &State,
         output_buffer: &str,
         todo: &mut TodoList,
+        task_name: Option<&str>
     ) -> ResultIo<()> {
         if let State::AddingTodo(_) = *current_state_data { 
-            todo.add_item(&output_buffer)?;
+            todo.add_item_with_date(&output_buffer, "2023 May 24, 16:00:00")?;
             return Ok(());
         }
         
@@ -369,6 +383,10 @@ pub mod tui_handler {
             InvalidData => { 
                 render_main(terminal, BufferType::Error("Invalid or Empty Data"), todo_items).unwrap();
                 return Ok(());
+            }
+            Unsupported => { 
+                render_main(terminal, BufferType::Error("Invalid Date"), todo_items).unwrap();
+                return Ok(()); 
             }
             _ => return Err(e),
         }

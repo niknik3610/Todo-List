@@ -8,7 +8,6 @@ pub mod todo {
         vec::Vec,
     };
     use chrono::{NaiveDateTime};
-
     #[derive(Debug)]
     pub enum TodoError {
         TodoOutOfBoundsError,
@@ -38,26 +37,30 @@ pub mod todo {
             }
         }
         pub fn add_item(&mut self, item_title: &str) -> ResultIo<usize> {
-            let _time = chrono::offset::Local::now();
-            
+            self.todo_items.push(
+                TodoItem::new(
+                    item_title.to_string(), 
+                    None)
+                );
+            return Ok(self.todo_items.len() - 1);
+        }
+        pub fn add_item_with_date(
+            &mut self, item_title: &str, date: &str) -> ResultIo<usize> {
+
             let date = match NaiveDateTime::parse_from_str(
-                "2023 April 23, 12:0:0", "%Y %b %d, %H:%M:%S") {
+                date, "%Y %b %d, %H:%M:%S") {
                 Ok(r) => r,
                 Err(_) => return Err(std::io::ErrorKind::Unsupported.into()),   
             };
-            /*
-            let date = match Local::with_ymd_and_hms(&time.timezone(), 2023, 04, 22, 01, 01, 01) {
-                chrono::LocalResult::Single(r) => r,
-                _ => return Err(ErrorKind::InvalidData.into())
-            };
-            */
             self.todo_items.push(
                 TodoItem::new(
                     item_title.to_string(), 
                     Some(date))
-            );
+                );
             return Ok(self.todo_items.len() - 1);
         }
+
+
         pub fn complete_item(&mut self, item_id: usize) -> ResultIo<()> {
             if item_id > self.todo_items.len() - 1 {
                 return Err(ErrorKind::InvalidInput.into());
@@ -86,10 +89,10 @@ pub mod todo {
                 .iter()
                 .enumerate()
                 .find(|(_index, item)| item.title == item_title)
-            {
-                Some((id, _)) => Some(id),
-                None => None,
-            }
+                {
+                    Some((id, _)) => Some(id),
+                    None => None,
+                }
         }
         pub fn todo_len(&self) -> usize {
             return self.todo_items.len();

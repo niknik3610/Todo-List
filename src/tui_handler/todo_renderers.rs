@@ -95,7 +95,8 @@ pub fn render_main(
 
 pub fn render_adding(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    buffer: &str,
+    name_buffer: &str,
+    date_buffer: &str,
     todo_items: &String,
     _adding_state: AddState
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -147,7 +148,8 @@ pub fn render_adding(
                         .border_type(widgets::BorderType::Plain),
                 );
 
-            let new_todo = widgets::Paragraph::new("    Task Name: ".to_owned() + buffer)
+            let todo_string = format!(" Task Name: {name_buffer}\n Task Date: {date_buffer}");
+            let new_todo = widgets::Paragraph::new(todo_string)
                 .style(Style::default().fg(Color::LightCyan))
                 .alignment(layout::Alignment::Left)
                 .block(
