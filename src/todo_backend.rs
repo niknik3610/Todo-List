@@ -46,8 +46,8 @@ pub mod todo {
         }
         pub fn add_item_with_date(
             &mut self, item_title: &str, date: &str) -> ResultIo<usize> {
-            let date = match NaiveDateTime::parse_from_str(
-                date, "%Y %b %d, %H:%M:%S") {
+            let date = match NaiveDateTime::
+                parse_from_str(date, "%Y %b %d, %H:%M:%S") {
                 Ok(r) => r,
                 Err(_) => return Err(std::io::ErrorKind::Unsupported.into()),   
             };

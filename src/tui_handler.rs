@@ -1,7 +1,8 @@
-mod todo_renderers;
+mod tui_rendering_handler;
+mod tui_input_handler;
 pub mod tui_handler {
     use crate::todo_backend::todo::TodoList;
-    use crate::tui_handler::todo_renderers::*;
+    use crate::tui_handler::*;
     use crossterm::event as CEvent;
     use crossterm::execute;
     use crossterm::terminal::LeaveAlternateScreen;
@@ -21,17 +22,17 @@ pub mod tui_handler {
     use tui::backend::CrosstermBackend;
     use tui::Terminal;
 
-    const MAX_TICK_TIME: Duration = Duration::from_millis(200);
+    pub const MAX_TICK_TIME: Duration = Duration::from_millis(200);
     const COMPLETED_ITEM: [char; 2] = [' ', 'X'];
 
     type ResultIo<T> = Result<T, io::Error>;
 
-    enum Event<T> {
+    pub enum Event<T> {
         Input(T),
         Tick,
     }
 
-    enum State {
+    pub enum State {
         Viewing,
         Quitting,
         AddingTodo(AddState),
@@ -40,7 +41,7 @@ pub mod tui_handler {
         Error,
     }
 
-    enum UserAction {
+    pub enum UserAction {
         Quit,
         AddTodo,
         CompeleteTodo,
@@ -49,7 +50,7 @@ pub mod tui_handler {
         None,
     }
 
-    enum BufferAction {
+    pub enum BufferAction {
         Input(char),
         SubmitBuffer,
         Backspace,
@@ -158,7 +159,7 @@ pub mod tui_handler {
                                     }, 
                                     _ => { 
                                         let submit_result = 
-                                            submit_buffer(&current_state_data, &*user_input_buffer, storage_buff.clone(), todo); 
+                                            submit_buffer(&current_state_data, &*storage_buff, &user_input_buffer, todo); 
 
                                         *current_state_data = State::Viewing;
                                         todo_items = generate_todo(todo);
@@ -226,63 +227,7 @@ pub mod tui_handler {
         }
     }
 
-    fn capture_input(
-        sx: &Sender<Event<CEvent::KeyEvent>>,
-        current_tick_time: &mut Instant,
-    ) -> ResultIo<()> {
-        let event_timer = MAX_TICK_TIME
-            .checked_sub(current_tick_time.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
-
-        if CEvent::poll(event_timer).expect("Polling Doesn't Work") {
-            if let CEvent::Event::Key(key) = CEvent::read().expect("Reading Events Doesn't Work") {
-                sx.send(Event::Input(key)).expect("Sending Events");
-            }
-        }
-
-        if current_tick_time.elapsed() >= MAX_TICK_TIME {
-            match sx.send(Event::Tick) {
-                Ok(_) => *current_tick_time = Instant::now(),
-                Err(e) => eprintln!("{e}"),
-            }
-        }
-
-        Ok(())
-    }
-
-    fn handle_input(
-        input: CEvent::KeyEvent,
-        current_state: &Arc<Mutex<State>>,
-    ) -> ResultIo<UserAction> {
-        use crossterm::event::KeyCode;
-        let current_state_data = current_state.lock().unwrap();
-
-        //handles user actions in normal mode
-        if let State::Viewing = *current_state_data {
-            let key = match input.code {
-                KeyCode::Char(input) => input,
-                _ => return Ok(UserAction::None),
-            };
-
-            return match key {
-                'q' => Ok(UserAction::Quit),
-                'n' => Ok(UserAction::AddTodo),
-                'c' => Ok(UserAction::CompeleteTodo),
-                'u' => Ok(UserAction::UncompleteTodo),
-                _ => Ok(UserAction::None),
-            };
-        }
-
-        //handles user actions when in buffer mode
-        use BufferAction::*;
-        match input.code {
-            KeyCode::Char(input) => return Ok(UserAction::ManipulateBuffer(Input(input))),
-            KeyCode::Backspace => return Ok(UserAction::ManipulateBuffer(Backspace)),
-            KeyCode::Enter => return Ok(UserAction::ManipulateBuffer(SubmitBuffer)),
-            KeyCode::Esc => return Ok(UserAction::ManipulateBuffer(ExitBuffer)),
-            _ => return Ok(UserAction::None),
-        };
-    }
+    
 
     fn generate_todo(todo: &TodoList) -> String {
         let mut todo_str = String::from("Todo:\n");
@@ -343,14 +288,16 @@ pub mod tui_handler {
     fn submit_buffer(
         current_state_data: &State,
         output_buffer: &str,
-        storage_buff: String,
+        storage_buff: &String,
         todo: &mut TodoList,
     ) -> ResultIo<()> { 
         if let State::AddingTodo(state) = *current_state_data { 
             match state {
                 AddState::EnteringName => todo.add_item(&output_buffer)?,
-                AddState::EnteringDate => 
-                    todo.add_item_with_date(&output_buffer, &*storage_buff)?
+                AddState::EnteringDate => { 
+                    //todo.add_item(&*format!("'{output_buffer}'"))?
+                    todo.add_item_with_date(&output_buffer, &*storage_buff)? 
+                }
             };
             return Ok(());
         }
