@@ -1,15 +1,22 @@
 mod tui_rendering_handler;
 mod tui_input_handler;
+mod tui_buffer_handler;
+
 pub mod tui_handler {
     use crate::todo_backend::todo::TodoList; 
     use crate::tui_handler::{
         tui_input_handler as input,
-        tui_rendering_handler as render
+        tui_rendering_handler as render,
+        tui_buffer_handler as buffer,
     };
     use crossterm::event as CEvent;
     use crossterm::execute;
-    use crossterm::terminal::LeaveAlternateScreen;
-    use crossterm::terminal::{self as cTerm, disable_raw_mode, enable_raw_mode};
+    use crossterm::terminal::{
+        self as cTerm, 
+        disable_raw_mode, 
+        enable_raw_mode,
+        LeaveAlternateScreen
+    };
     use std::convert::From;
     use std::io::stdout;
     use std::io::ErrorKind;
@@ -157,13 +164,14 @@ pub mod tui_handler {
                             BufferAction::SubmitBuffer => {
                                  match *current_state_data {
                                     State::AddingTodo(AddState::EnteringName) => {
-                                        swap_buffers(&user_input_buffer, &mut storage_buff)?;
+                                        buffer::swap_buffers(&user_input_buffer, &mut storage_buff)?;
                                         user_input_buffer = String::new(); 
                                         *current_state_data = State::AddingTodo(AddState::EnteringDate);
                                     }, 
                                     _ => { 
                                         let submit_result = 
-                                            submit_buffer(&current_state_data, &*storage_buff, &user_input_buffer, todo); 
+                                            buffer::submit_buffer
+                                            (&current_state_data, &*storage_buff, &user_input_buffer, todo); 
 
                                         *current_state_data = State::Viewing;
                                         todo_items = generate_todo(todo);
@@ -285,53 +293,7 @@ pub mod tui_handler {
             });
 
         return todo_str;
-    }
-
-    fn submit_buffer(
-        current_state_data: &State,
-        output_buffer: &str,
-        storage_buff: &String,
-        todo: &mut TodoList,
-    ) -> ResultIo<()> { 
-        if let State::AddingTodo(state) = *current_state_data { 
-            match state {
-                AddState::EnteringName => todo.add_item(&output_buffer)?,
-                AddState::EnteringDate => { 
-                    //todo.add_item(&*format!("'{output_buffer}'"))?
-                    todo.add_item_with_date(&output_buffer, &*storage_buff)? 
-                }
-            };
-            return Ok(());
-        }
-        
-        let output_buffer = match output_buffer.parse::<usize>() {
-            Ok(r) => r,
-            Err(_) => return Err(ErrorKind::InvalidInput.into())
-        }; 
-
-        match *current_state_data {
-            State::CompletingTodo => {
-                if output_buffer > todo.todo_len() - 1 {
-                    return Err(ErrorKind::InvalidInput.into());
-                }
-                todo.complete_item(output_buffer)?;
-            },
-            State::UncompletingTodo => {
-                if output_buffer > todo.completed_len() - 1 {
-                    return Err(ErrorKind::InvalidInput.into());
-                }
-                todo.uncomplete_item(output_buffer)?;
-            }
-            _ => {}
-        }
-
-        return Ok(());
-    }
-
-    fn swap_buffers(prev_buff: &str, storage_buff: &mut String) -> ResultIo<()> {
-        *storage_buff = prev_buff.to_string();
-        return Ok(())
-    }
+    } 
 
     fn handle_errors(
         e: io::Error,
