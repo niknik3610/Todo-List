@@ -7,8 +7,6 @@ use tui::{
     widgets, Terminal,
 };
 
-use super::tui_handler::AddState;
-
 pub enum BufferType<'a> {
     None,
     AddingTask(&'a str),

@@ -1,6 +1,15 @@
-use super::*;
+use std::sync::mpsc::Sender;
 
-fn capture_input(
+use super::tui_handler::*;
+use super::tui_handler::MAX_TICK_TIME;
+use crossterm::event as CEvent;
+use std::sync::{Arc, Mutex};
+use std::{
+    io,
+    time::{Duration, Instant},
+};
+
+pub fn capture_input(
         sx: &Sender<Event<CEvent::KeyEvent>>,
         current_tick_time: &mut Instant,
     ) -> io::Result<()> {
@@ -24,7 +33,7 @@ fn capture_input(
         Ok(())
     }
 
-    fn handle_input(
+pub fn handle_input(
         input: CEvent::KeyEvent,
         current_state: &Arc<Mutex<State>>,
     ) -> io::Result<UserAction> {

@@ -1,8 +1,11 @@
 mod tui_rendering_handler;
 mod tui_input_handler;
 pub mod tui_handler {
-    use crate::todo_backend::todo::TodoList;
-    use crate::tui_handler::*;
+    use crate::todo_backend::todo::TodoList; 
+    use crate::tui_handler::{
+        tui_input_handler as input,
+        tui_rendering_handler as render
+    };
     use crossterm::event as CEvent;
     use crossterm::execute;
     use crossterm::terminal::LeaveAlternateScreen;
@@ -15,7 +18,7 @@ pub mod tui_handler {
     use std::{
         io,
         sync::mpsc::channel,
-        sync::mpsc::{Receiver, Sender},
+        sync::mpsc::Receiver,
         thread,
         time::{Duration, Instant},
     };
@@ -84,7 +87,8 @@ pub mod tui_handler {
                         break;
                     }
                     drop(current_state);
-                    capture_input(&sx, &mut current_tick_time).expect("Input handler crashed");
+                    input::capture_input
+                        (&sx, &mut current_tick_time).expect("Input handler crashed");
                 }
             }));
         }
@@ -120,11 +124,11 @@ pub mod tui_handler {
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend).expect("Creating Terminal Failed");
 
-        render_main(&mut terminal, BufferType::None, &todo_items).unwrap();
+        render::render_main(&mut terminal, render::BufferType::None, &todo_items).unwrap();
         loop {
             //waits for user-input to render
             let input_result = match rx.recv().unwrap() {
-                Event::Input(input) => handle_input(input, &current_state),
+                Event::Input(input) => input::handle_input(input, &current_state),
                 Event::Tick => continue,
             };
 
@@ -190,17 +194,17 @@ pub mod tui_handler {
             {
                 let mut current_state = current_state.lock().unwrap();
                 match *current_state {
-                    State::Viewing => render_main(&mut terminal, BufferType::None, &todo_items)?,
+                    State::Viewing => render::render_main(&mut terminal, render::BufferType::None, &todo_items)?,
                     State::AddingTodo(state)  => {
                         use AddState::*;
                         match state {
-                            EnteringName => render_adding(
+                            EnteringName => render::render_adding(
                                 &mut terminal,
                                 user_input_buffer.as_str(),
                                 "",
                                 &todo_items,
                                 )?,
-                            EnteringDate => render_adding(
+                            EnteringDate => render::render_adding(
                                 &mut terminal,
                                 &storage_buff[..],
                                 user_input_buffer.as_str(),
@@ -208,14 +212,14 @@ pub mod tui_handler {
                                 )?,
                         }
                     },
-                    State::CompletingTodo => render_main(
+                    State::CompletingTodo => render::render_main(
                         &mut terminal,
-                        BufferType::CompletingTask(&user_input_buffer),
+                        render::BufferType::CompletingTask(&user_input_buffer),
                         &todo_items,
                         )?,
-                    State::UncompletingTodo => render_main(
+                    State::UncompletingTodo => render::render_main(
                         &mut terminal,
-                        BufferType::UncompletingTask(&user_input_buffer),
+                        render::BufferType::UncompletingTask(&user_input_buffer),
                         &todo_items,
                         )?,
                     State::Error => *current_state = State::Viewing,
@@ -226,8 +230,6 @@ pub mod tui_handler {
             }
         }
     }
-
-    
 
     fn generate_todo(todo: &TodoList) -> String {
         let mut todo_str = String::from("Todo:\n");
@@ -339,15 +341,15 @@ pub mod tui_handler {
         use ErrorKind::*;
         match e.kind() {
             InvalidInput => {
-                render_main(terminal, BufferType::Error("Invalid Input"), todo_items).unwrap();
+                render::render_main(terminal, render::BufferType::Error("Invalid Input"), todo_items).unwrap();
                 return Ok(());
             }
             InvalidData => { 
-                render_main(terminal, BufferType::Error("Invalid or Empty Data"), todo_items).unwrap();
+                render::render_main(terminal, render::BufferType::Error("Invalid or Empty Data"), todo_items).unwrap();
                 return Ok(());
             }
             Unsupported => { 
-                render_main(terminal, BufferType::Error("Invalid Date"), todo_items).unwrap();
+                render::render_main(terminal, render::BufferType::Error("Invalid Date"), todo_items).unwrap();
                 return Ok(()); 
             }
             _ => return Err(e),
