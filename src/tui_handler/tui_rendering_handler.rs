@@ -1,4 +1,4 @@
-use std::{io::Stdout};
+use std::{io::{Stdout, self}};
 
 use tui::{
     backend::CrosstermBackend,
@@ -19,7 +19,7 @@ pub fn render_main(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     buffer: BufferType,
     todo_items: &String,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> io::Result<()> {
     let command_contents = match buffer {
         BufferType::None => "Command Mode".to_owned(),
         BufferType::AddingTask(b) => "Adding: ".to_owned() + b,
@@ -96,7 +96,7 @@ pub fn render_adding(
     name_buffer: &str,
     date_buffer: &str,
     todo_items: &String,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> io::Result<()> {
     terminal
         .draw(|rec| {
             let size = rec.size();
