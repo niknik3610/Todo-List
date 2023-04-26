@@ -6,15 +6,15 @@ use super::tui_handler::{State, AddState};
 pub fn submit_buffer(
     current_state_data: &State,
     output_buffer: &str,
-    storage_buff: &String,
+    date_storage_buff: &String,
     todo: &mut TodoList,
     ) -> io::Result<()> { 
     if let State::AddingTodo(state) = *current_state_data { 
         match state {
             AddState::EnteringName => todo.add_item(&output_buffer)?,
-            AddState::EnteringDate => { 
-                //todo.add_item(&*format!("'{output_buffer}'"))?
-                todo.add_item_with_date(&output_buffer, &*storage_buff)? 
+            AddState::EnteringDate(_) => { 
+                // todo.add_item(&*format!("'{date_storage_buff}'"))?;
+                todo.add_item_with_date(&output_buffer, &*date_storage_buff)? 
             }
         };
         return Ok(());

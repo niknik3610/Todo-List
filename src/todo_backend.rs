@@ -1,5 +1,5 @@
 pub mod todo {
-    #[allow(dead_code, un)]
+    #[allow(dead_code)]
     use core::fmt;
     use serde::{Deserialize, Serialize};
     use std::{error::Error, io::Result as ResultIo};
@@ -47,7 +47,7 @@ pub mod todo {
         pub fn add_item_with_date(
             &mut self, item_title: &str, date: &str) -> ResultIo<usize> {
             let date = match NaiveDateTime::
-                parse_from_str(date, "%Y %b %d, %H:%M:%S") {
+                parse_from_str(date, "%Y %b %d %H:%M:%S") {
                 Ok(r) => r,
                 Err(_) => return Err(std::io::ErrorKind::Unsupported.into()),   
             };

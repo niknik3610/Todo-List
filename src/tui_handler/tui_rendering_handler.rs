@@ -7,6 +7,8 @@ use tui::{
     widgets, Terminal,
 };
 
+use super::tui_handler::DateState;
+
 pub enum BufferType<'a> {
     None,
     AddingTask(&'a str),
@@ -95,8 +97,19 @@ pub fn render_adding(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     name_buffer: &str,
     date_buffer: &str,
+    date_storage_buff: &str,
     todo_items: &String,
+    date_state: &DateState
 ) -> io::Result<()> {
+    let mut todo_string = format!(" Task Name: {name_buffer}\n Task Date {date_storage_buff}\n ");
+    match date_state {
+        DateState::Year => todo_string += &*("Enter Year: ".to_owned() + date_buffer),
+        DateState::Month=> todo_string += &*("Enter Month: ".to_owned() + date_buffer),
+        DateState::Day => todo_string += &*("Enter Day: ".to_owned() + date_buffer),
+        DateState::Time=> todo_string += &*("Enter Time: ".to_owned() + date_buffer),
+    }
+
+
     terminal
         .draw(|rec| {
             let size = rec.size();
@@ -145,7 +158,6 @@ pub fn render_adding(
                         .border_type(widgets::BorderType::Plain),
                 );
 
-            let todo_string = format!(" Task Name: {name_buffer}\n Task Date: {date_buffer}");
             let new_todo = widgets::Paragraph::new(todo_string)
                 .style(Style::default().fg(Color::LightCyan))
                 .alignment(layout::Alignment::Left)

@@ -9,6 +9,7 @@ pub mod tui_handler {
         tui_rendering_handler as render,
         tui_buffer_handler as buffer,
     };
+    use chrono::Month;
     use crossterm::event as CEvent;
     use crossterm::execute;
     use crossterm::terminal::{
@@ -70,7 +71,25 @@ pub mod tui_handler {
     #[derive(Copy, Clone)] 
     pub enum AddState {
         EnteringName,
-        EnteringDate,
+        EnteringDate(DateState),
+    }
+
+    #[derive(Copy, Clone)] 
+    pub enum DateState {
+        Year,
+        Month,
+        Day,
+        Time,
+    }
+    impl DateState {
+        fn next(&self) -> Option<DateState> {
+            match *self {
+                DateState::Year => return Some(DateState::Month),  
+                DateState::Month => return Some(DateState::Day),
+                DateState::Day => return Some(DateState::Time),
+                DateState::Time =>  return None
+            }
+        }
     }
 
     pub fn run_tui(todo_list: &mut TodoList) -> ResultIo<()> {
@@ -129,13 +148,15 @@ pub mod tui_handler {
         current_state: &Arc<Mutex<State>>,
         todo: &mut TodoList,
         ) -> Result<(), Box<dyn std::error::Error>> { 
-        let mut user_input_buffer = String::from("");
-        let mut storage_buff = "".to_string();  
         let mut todo_items = generate_todo(todo);
 
         let stdout = io::stdout();
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend).expect("Creating Terminal Failed");
+
+        let mut user_input_buffer = String::new();
+        let mut name_storage_buff = String::new();
+        let mut date_storage_buff = String::new();
 
         render::render_main(&mut terminal, render::BufferType::None, &todo_items)?;
         loop {
@@ -181,33 +202,64 @@ pub mod tui_handler {
                         BufferAction::SubmitBuffer => {
                             match *current_state {
                                 State::AddingTodo(AddState::EnteringName) => {
-                                    buffer::swap_buffers(&user_input_buffer, &mut storage_buff)?;
+                                    buffer::swap_buffers(&user_input_buffer, &mut name_storage_buff)?;
                                     user_input_buffer = String::new(); 
-                                    *current_state = State::AddingTodo(AddState::EnteringDate);
+                                    *current_state = State::AddingTodo(AddState::EnteringDate(DateState::Year));
                                 }, 
-                                _ => { 
-                                    let submit_result = 
-                                        buffer::submit_buffer
-                                        (&current_state, &*storage_buff, &user_input_buffer, todo); 
+                                State::AddingTodo(AddState::EnteringDate(state)) => {
+                                    if let DateState::Time = state {
+                                        date_storage_buff += &*(user_input_buffer);
+                                        let submit_result = 
+                                            buffer::submit_buffer(
+                                            &current_state, 
+                                            &*name_storage_buff,
+                                            &date_storage_buff,
+                                            todo
+                                            ); 
 
-                                    *current_state = State::Viewing;
-                                    todo_items = generate_todo(todo);
-                                    user_input_buffer = String::from("");
-
-                                    if let Err(e) = submit_result {
-                                        handle_errors(e, &mut terminal, &todo_items)?;
                                         *current_state = State::Viewing;
-                                        user_input_buffer = String::new();
-                                        continue;
+                                        todo_items = generate_todo(todo);
+                                        date_storage_buff = String::new();
+                                        user_input_buffer = String::from("");
+
+                                        if let Err(e) = submit_result {
+                                            handle_errors(e, &mut terminal, &todo_items)?;
+                                            *current_state = State::Viewing;
+                                            user_input_buffer = String::new();
+                                            continue;
+                                        }
                                     }
+                                    else {
+                                        date_storage_buff += &*(user_input_buffer + " ");
+                                        *current_state = 
+                                            State::AddingTodo(AddState::EnteringDate(state.next().unwrap()));
+                                        user_input_buffer = String::new();
+                                    }
+                                },
+                                _ => {
+                                    let submit_result = buffer::submit_buffer(&*current_state, "", &date_storage_buff, todo);
+                                    if let Err(e) = submit_result {
+                                        let submit_result = 
+                                            buffer::submit_buffer(&current_state_data, &user_input_buffer[..], todo);
+
+                                        if let Err(e) = submit_result {
+                                            handle_errors(e, &mut terminal, &todo_items)?;
+                                            *current_state_data = State::Viewing;
+                                            user_input_buffer = String::new();
+                                            continue;
+                                        }
+
+                                        *current_state_data = State::Viewing;
+                                        todo_items = generate_todo(todo);
+                                        user_input_buffer = String::from("");                                    }
                                 }
-                            };
+                            }
                         }
                     }
                 }, 
             }
             //render the correct state
-            render(&mut current_state, &user_input_buffer, &todo_items, &mut terminal, &storage_buff)?;
+            render(&mut current_state, &user_input_buffer, &todo_items, &mut terminal, &name_storage_buff, &*date_storage_buff)?;
         }
     }
 
@@ -216,7 +268,8 @@ pub mod tui_handler {
             user_input_buffer: &String,
             todo_items: &String,
             mut terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-            storage_buff: &String
+            storage_buff: &String,
+            date_storage_buff: &str,
         ) -> ResultIo<()> {
         match **current_state {
             State::Viewing => 
@@ -228,13 +281,17 @@ pub mod tui_handler {
                         &mut terminal,
                         &*(user_input_buffer.to_owned() + "█"),
                         "",
+                        "",
                         &todo_items,
+                        &DateState::Year
                         )?,
-                    EnteringDate => render::render_adding(
+                    EnteringDate(state) => render::render_adding(
                         &mut terminal,
                         &storage_buff[..],
                         &*(user_input_buffer.to_owned() + "█"),
+                        date_storage_buff,
                         &todo_items,
+                        &state
                         )?,
                 }
             },
