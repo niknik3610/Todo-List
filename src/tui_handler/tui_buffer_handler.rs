@@ -1,6 +1,12 @@
 use crate::todo_backend::todo::TodoList;
 
-use super::tui_handler::{generate_todo, AddState, BufferAction, DateState, State};
+use super::tui_handler::{
+    generate_todo,
+    AddState,
+    BufferAction,
+    DateState,
+    State,
+};
 use std::io::{self, ErrorKind};
 
 pub fn submit_buffer(
@@ -66,7 +72,10 @@ pub fn manipulate_buffer(
         }
         BufferAction::ExitBuffer => {
             *current_state = State::Viewing;
+            *date_storage_buff = String::new();
             *user_input_buffer = String::new();
+            *date_storage_buff = String::new();
+
         }
         BufferAction::SubmitBuffer => {
             match_buffer_submit(
@@ -81,6 +90,7 @@ pub fn manipulate_buffer(
     }
     return Ok(());
 }
+
 fn match_buffer_submit(
     current_state: &mut State,
     user_input_buffer: &mut String,
@@ -108,7 +118,8 @@ fn match_buffer_submit(
                 *current_state = State::Viewing;
                 *todo_items = generate_todo(todo);
                 *date_storage_buff = String::new();
-                *user_input_buffer = String::from("");
+                *user_input_buffer = String::new();
+                *date_storage_buff = String::new();
             } else {
                 *date_storage_buff += &*(user_input_buffer.to_owned() + " ");
                 *current_state = State::AddingTodo(AddState::EnteringDate(state.next().unwrap()));
@@ -118,17 +129,10 @@ fn match_buffer_submit(
         //commands go here (will probably move this out at some point
         _ => {
             submit_command(&*current_state, &user_input_buffer, todo)?;
+            *current_state = State::Viewing;
+            *todo_items = generate_todo(todo);
+            *user_input_buffer = String::from("");
 
-            //     .or_else(|e| {
-            //         handle_errors(e, terminal, todo_items)
-            //     });
-            // if let Err(e) = submit_result {
-            //     let submit_result =
-            //         submit_buffer(&current_state_data, &user_input_buffer[..], todo);
-            //     *current_state = State::Viewing;
-            //     *todo_items = generate_todo(todo);
-            //     *user_input_buffer = String::from("");
-            //}
         }
     }
     return Ok(());
@@ -138,3 +142,4 @@ pub fn swap_buffers(prev_buff: &str, storage_buff: &mut String) -> io::Result<()
     *storage_buff = prev_buff.to_string();
     return Ok(());
 }
+

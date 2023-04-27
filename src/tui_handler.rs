@@ -202,7 +202,9 @@ pub mod tui_handler {
                         Err(e) => {
                             handle_errors(e, &mut terminal, &todo_items)?;
                             *current_state = State::Viewing;
+                            date_storage_buff = String::new();
                             user_input_buffer = String::new();
+                            date_storage_buff = String::new();
                             continue;
                         }
                     }
