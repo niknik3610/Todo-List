@@ -7,7 +7,6 @@ pub mod tui_handler {
     use crate::tui_handler::{
         tui_buffer_handler as buffer, tui_input_handler as input, tui_rendering_handler as render,
     };
-    use chrono::Month;
     use crossterm::event as CEvent;
     use crossterm::execute;
     use crossterm::terminal::{
@@ -29,7 +28,7 @@ pub mod tui_handler {
     use tui::Terminal;
 
     pub const MAX_TICK_TIME: Duration = Duration::from_millis(200);
-    const COMPLETED_ITEM: [char; 2] = [' ', 'X'];
+    const COMPLETED_ITEM: [char; 2] = [' ', '✓'];
 
     type ResultIo<T> = Result<T, io::Error>;
 
@@ -202,7 +201,6 @@ pub mod tui_handler {
                         Err(e) => {
                             handle_errors(e, &mut terminal, &todo_items)?;
                             *current_state = State::Viewing;
-                            date_storage_buff = String::new();
                             user_input_buffer = String::new();
                             date_storage_buff = String::new();
                             continue;
@@ -319,7 +317,7 @@ pub mod tui_handler {
             .enumerate()
             .for_each(|(index, item)| {
                 todo_str.push_str(&format!(
-                    "{index} - {item_name} [{completed}]\n",
+                    "{index} - {item_name} {completed}\n",
                     item_name = item.title,
                     completed = if !item.completed {
                         COMPLETED_ITEM[0]

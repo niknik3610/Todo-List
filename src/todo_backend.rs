@@ -1,5 +1,5 @@
 pub mod todo {
-    use chrono::NaiveDateTime;
+    use chrono::{Duration, NaiveDateTime};
     #[allow(dead_code)]
     use core::fmt;
     use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ pub mod todo {
         pub completed_items: Vec<TodoItem>,
     }
     impl TodoList {
-        pub fn new() -> TodoList {
+        pub const fn new() -> TodoList {
             TodoList {
                 todo_items: Vec::new(),
                 completed_items: Vec::new(),
@@ -43,6 +43,11 @@ pub mod todo {
                 Ok(r) => r,
                 Err(_) => return Err(std::io::ErrorKind::Unsupported.into()),
             };
+
+            let time_now = chrono::offset::Local::now();
+            if date.signed_duration_since(time_now.naive_local()) < Duration::zero() {
+                return Err(std::io::ErrorKind::Unsupported.into());
+            }
             self.todo_items
                 .push(TodoItem::new(item_title.to_string(), Some(date)));
             return Ok(self.todo_items.len() - 1);
@@ -57,6 +62,9 @@ pub mod todo {
             return Ok(());
         }
         pub fn uncomplete_item(&mut self, item_id: usize) -> ResultIo<()> {
+            if item_id > self.completed_items.len() - 1 {
+                return Err(ErrorKind::InvalidInput.into());
+            }
             self.completed_items[item_id].completed = false;
             self.todo_items.push(self.completed_items.remove(item_id));
             return Ok(());

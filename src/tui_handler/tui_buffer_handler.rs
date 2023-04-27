@@ -1,12 +1,6 @@
 use crate::todo_backend::todo::TodoList;
 
-use super::tui_handler::{
-    generate_todo,
-    AddState,
-    BufferAction,
-    DateState,
-    State,
-};
+use super::tui_handler::{generate_todo, AddState, BufferAction, DateState, State};
 use std::io::{self, ErrorKind};
 
 pub fn submit_buffer(
@@ -40,15 +34,9 @@ pub fn submit_command(
 
     match *current_state_data {
         State::CompletingTodo => {
-            if output_buffer > todo.todo_len() - 1 {
-                return Err(ErrorKind::InvalidInput.into());
-            }
             todo.complete_item(output_buffer)?;
         }
         State::UncompletingTodo => {
-            if output_buffer > todo.completed_len() - 1 {
-                return Err(ErrorKind::InvalidInput.into());
-            }
             todo.uncomplete_item(output_buffer)?;
         }
         _ => {}
@@ -75,7 +63,6 @@ pub fn manipulate_buffer(
             *date_storage_buff = String::new();
             *user_input_buffer = String::new();
             *date_storage_buff = String::new();
-
         }
         BufferAction::SubmitBuffer => {
             match_buffer_submit(
@@ -132,7 +119,6 @@ fn match_buffer_submit(
             *current_state = State::Viewing;
             *todo_items = generate_todo(todo);
             *user_input_buffer = String::from("");
-
         }
     }
     return Ok(());
@@ -142,4 +128,3 @@ pub fn swap_buffers(prev_buff: &str, storage_buff: &mut String) -> io::Result<()
     *storage_buff = prev_buff.to_string();
     return Ok(());
 }
-
