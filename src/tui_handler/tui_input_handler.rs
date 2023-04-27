@@ -1,7 +1,7 @@
 use std::sync::mpsc::Sender;
 
-use super::tui_handler::*;
 use super::tui_handler::MAX_TICK_TIME;
+use super::tui_handler::*;
 use crossterm::event as CEvent;
 use std::sync::{Arc, Mutex};
 use std::{
@@ -12,7 +12,7 @@ use std::{
 pub fn capture_input(
     sx: &Sender<Event<CEvent::KeyEvent>>,
     current_tick_time: &mut Instant,
-    ) -> io::Result<()> {
+) -> io::Result<()> {
     let event_timer = MAX_TICK_TIME
         .checked_sub(current_tick_time.elapsed())
         .unwrap_or_else(|| Duration::from_secs(0));
@@ -36,7 +36,7 @@ pub fn capture_input(
 pub fn handle_input(
     input: CEvent::KeyEvent,
     current_state: &Arc<Mutex<State>>,
-    ) -> io::Result<UserAction> {
+) -> io::Result<UserAction> {
     use crossterm::event::KeyCode;
     let current_state_data = current_state.lock().unwrap();
 

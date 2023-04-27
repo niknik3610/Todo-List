@@ -1,13 +1,10 @@
 pub mod todo {
+    use chrono::NaiveDateTime;
     #[allow(dead_code)]
     use core::fmt;
     use serde::{Deserialize, Serialize};
     use std::{error::Error, io::Result as ResultIo};
-    use std::{
-        io::ErrorKind,
-        vec::Vec,
-    };
-    use chrono::{NaiveDateTime};
+    use std::{io::ErrorKind, vec::Vec};
     #[derive(Debug)]
     pub enum TodoError {
         TodoOutOfBoundsError,
@@ -37,28 +34,19 @@ pub mod todo {
             }
         }
         pub fn add_item(&mut self, item_title: &str) -> ResultIo<usize> {
-            self.todo_items.push(
-                TodoItem::new(
-                    item_title.to_string(), 
-                    None)
-                );
+            self.todo_items
+                .push(TodoItem::new(item_title.to_string(), None));
             return Ok(self.todo_items.len() - 1);
         }
-        pub fn add_item_with_date(
-            &mut self, item_title: &str, date: &str) -> ResultIo<usize> {
-            let date = match NaiveDateTime::
-                parse_from_str(date, "%Y %b %d %H:%M:%S") {
+        pub fn add_item_with_date(&mut self, item_title: &str, date: &str) -> ResultIo<usize> {
+            let date = match NaiveDateTime::parse_from_str(date, "%Y %b %d %H:%M:%S") {
                 Ok(r) => r,
-                Err(_) => return Err(std::io::ErrorKind::Unsupported.into()),   
+                Err(_) => return Err(std::io::ErrorKind::Unsupported.into()),
             };
-            self.todo_items.push(
-                TodoItem::new(
-                    item_title.to_string(), 
-                    Some(date))
-                );
+            self.todo_items
+                .push(TodoItem::new(item_title.to_string(), Some(date)));
             return Ok(self.todo_items.len() - 1);
         }
-
 
         pub fn complete_item(&mut self, item_id: usize) -> ResultIo<()> {
             if item_id > self.todo_items.len() - 1 {
@@ -68,7 +56,7 @@ pub mod todo {
             self.completed_items.push(self.todo_items.remove(item_id));
             return Ok(());
         }
-        pub fn uncomplete_item(&mut self, item_id: usize) -> ResultIo<()> { 
+        pub fn uncomplete_item(&mut self, item_id: usize) -> ResultIo<()> {
             self.completed_items[item_id].completed = false;
             self.todo_items.push(self.completed_items.remove(item_id));
             return Ok(());
@@ -88,10 +76,10 @@ pub mod todo {
                 .iter()
                 .enumerate()
                 .find(|(_index, item)| item.title == item_title)
-                {
-                    Some((id, _)) => Some(id),
-                    None => None,
-                }
+            {
+                Some((id, _)) => Some(id),
+                None => None,
+            }
         }
         pub fn todo_len(&self) -> usize {
             return self.todo_items.len();
