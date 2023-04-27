@@ -1,4 +1,4 @@
-use std::{io::Stdout, alloc::Layout};
+use std::io::{self, Stdout};
 
 use tui::{
     backend::CrosstermBackend,
@@ -6,6 +6,8 @@ use tui::{
     style::{Color, Modifier, Style},
     widgets, Terminal,
 };
+
+use super::tui_handler::DateState;
 
 pub enum BufferType<'a> {
     None,
@@ -19,7 +21,7 @@ pub fn render_main(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     buffer: BufferType,
     todo_items: &String,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> io::Result<()> {
     let command_contents = match buffer {
         BufferType::None => "Command Mode".to_owned(),
         BufferType::AddingTask(b) => "Adding: ".to_owned() + b,
@@ -93,9 +95,20 @@ pub fn render_main(
 
 pub fn render_adding(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    buffer: &str,
+    name_buffer: &str,
+    date_buffer: &str,
+    date_storage_buff: &str,
     todo_items: &String,
-) -> Result<(), Box<dyn std::error::Error>> {
+    date_state: &DateState,
+) -> io::Result<()> {
+    let mut todo_string = format!(" Task Name: {name_buffer}\n Task Date {date_storage_buff}\n ");
+    match date_state {
+        DateState::Year => todo_string += &*("Enter Year: ".to_owned() + date_buffer),
+        DateState::Month => todo_string += &*("Enter Month: ".to_owned() + date_buffer),
+        DateState::Day => todo_string += &*("Enter Day: ".to_owned() + date_buffer),
+        DateState::Time => todo_string += &*("Enter Time: ".to_owned() + date_buffer),
+    }
+
     terminal
         .draw(|rec| {
             let size = rec.size();
@@ -125,14 +138,14 @@ pub fn render_adding(
             let content = layout::Layout::default()
                 .direction(layout::Direction::Horizontal)
                 .margin(0)
-                .constraints([
-                    layout::Constraint::Percentage(70),
-                    layout::Constraint::Percentage(30),
-                ]
-                .as_ref(),
+                .constraints(
+                    [
+                        layout::Constraint::Percentage(70),
+                        layout::Constraint::Percentage(30),
+                    ]
+                    .as_ref(),
                 )
                 .split(chunks[1]);
-
 
             let todos = widgets::Paragraph::new(todo_items.clone())
                 .style(Style::default().fg(Color::LightCyan))
@@ -144,7 +157,7 @@ pub fn render_adding(
                         .border_type(widgets::BorderType::Plain),
                 );
 
-            let new_todo = widgets::Paragraph::new("    Task Name: ".to_owned() + buffer)
+            let new_todo = widgets::Paragraph::new(todo_string)
                 .style(Style::default().fg(Color::LightCyan))
                 .alignment(layout::Alignment::Left)
                 .block(
@@ -154,7 +167,6 @@ pub fn render_adding(
                         .title("New Task")
                         .border_type(widgets::BorderType::Thick),
                 );
-
 
             let command_buffer = widgets::Paragraph::new("Adding Task")
                 .style(

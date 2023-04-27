@@ -1,12 +1,18 @@
-mod todo_renderers;
+mod tui_buffer_handler;
+mod tui_input_handler;
+mod tui_rendering_handler;
+
 pub mod tui_handler {
     use crate::todo_backend::todo::TodoList;
-    use crate::tui_handler::todo_renderers::*;
-
+    use crate::tui_handler::{
+        tui_buffer_handler as buffer, tui_input_handler as input, tui_rendering_handler as render,
+    };
+    use chrono::Month;
     use crossterm::event as CEvent;
     use crossterm::execute;
-    use crossterm::terminal::LeaveAlternateScreen;
-    use crossterm::terminal::{self as cTerm, disable_raw_mode, enable_raw_mode};
+    use crossterm::terminal::{
+        self as cTerm, disable_raw_mode, enable_raw_mode, LeaveAlternateScreen,
+    };
     use std::convert::From;
     use std::io::stdout;
     use std::io::ErrorKind;
@@ -15,43 +21,70 @@ pub mod tui_handler {
     use std::{
         io,
         sync::mpsc::channel,
-        sync::mpsc::{Receiver, Sender},
+        sync::mpsc::Receiver,
         thread,
         time::{Duration, Instant},
     };
     use tui::backend::CrosstermBackend;
     use tui::Terminal;
 
-    const MAX_TICK_TIME: Duration = Duration::from_millis(200);
+    pub const MAX_TICK_TIME: Duration = Duration::from_millis(200);
     const COMPLETED_ITEM: [char; 2] = [' ', 'X'];
 
     type ResultIo<T> = Result<T, io::Error>;
 
-    enum Event<T> {
+    pub enum Event<T> {
         Input(T),
         Tick,
     }
 
-    enum State {
+    pub enum State {
         Viewing,
         Quitting,
-        AddingTodo,
+        AddingTodo(AddState),
         CompletingTodo,
         UncompletingTodo,
         Error,
     }
 
-    enum UserAction {
-        View,
+    pub enum UserAction {
         Quit,
         AddTodo,
         CompeleteTodo,
         UncompleteTodo,
-        //input Actions
+        ManipulateBuffer(BufferAction),
+        None,
+    }
+
+    pub enum BufferAction {
         Input(char),
         SubmitBuffer,
         Backspace,
-        None,
+        ExitBuffer,
+    }
+
+    #[derive(Copy, Clone)]
+    pub enum AddState {
+        EnteringName,
+        EnteringDate(DateState),
+    }
+
+    #[derive(Copy, Clone)]
+    pub enum DateState {
+        Year,
+        Month,
+        Day,
+        Time,
+    }
+    impl DateState {
+        pub fn next(&self) -> Option<DateState> {
+            match *self {
+                DateState::Year => return Some(DateState::Month),
+                DateState::Month => return Some(DateState::Day),
+                DateState::Day => return Some(DateState::Time),
+                DateState::Time => return None,
+            }
+        }
     }
 
     pub fn run_tui(todo_list: &mut TodoList) -> ResultIo<()> {
@@ -63,9 +96,10 @@ pub mod tui_handler {
         let (sx, rx) = channel();
         let mut threads = Vec::new();
 
-        //input thread and loop 
+        //input thread and loop
         {
             let current_state = current_state.clone();
+
             threads.push(thread::spawn(move || {
                 let mut current_tick_time = Instant::now();
                 loop {
@@ -75,27 +109,32 @@ pub mod tui_handler {
                         break;
                     }
                     drop(current_state);
-                    capture_input(&sx, &mut current_tick_time).expect("Input handler crashed");
+
+                    input::capture_input(&sx, &mut current_tick_time)
+                        .expect("Input handler crashed");
                 }
             }));
         }
-        
+
         let tui_result = tui_loop(&rx, &current_state, todo_list);
 
-        //exits gracefully on error
-        if let Err(e) = tui_result { 
-            eprintln!("{:?}", e);
-
+        {
             let mut current_state = current_state.lock().unwrap();
             *current_state = State::Quitting;
         }
 
+        //exits gracefully on error
         threads
             .into_iter()
             .for_each(|thread| thread.join().unwrap());
-        
+
         disable_raw_mode().unwrap();
         execute!(stdout(), LeaveAlternateScreen).unwrap();
+
+        if let Err(e) = tui_result {
+            eprintln!("{:?}", e);
+        }
+
         return Ok(());
     }
 
@@ -103,159 +142,148 @@ pub mod tui_handler {
         rx: &Receiver<Event<CEvent::KeyEvent>>,
         current_state: &Arc<Mutex<State>>,
         todo: &mut TodoList,
-        ) -> Result<(), Box<dyn std::error::Error>> { 
-        let mut user_input_buffer = String::from("");
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut todo_items = generate_todo(todo);
 
         let stdout = io::stdout();
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend).expect("Creating Terminal Failed");
 
-        render_main(&mut terminal, BufferType::None, &todo_items).unwrap();
+        let mut user_input_buffer = String::new();
+        let mut name_storage_buff = String::new();
+        let mut date_storage_buff = String::new();
+
+        render::render_main(&mut terminal, render::BufferType::None, &todo_items)?;
         loop {
+            {
+                let current_state = current_state.lock().unwrap();
+                if let State::Quitting = *current_state {
+                    return Ok(());
+                }
+            }
+
             //waits for user-input to render
-            let input_result = match rx.recv().unwrap() {
-                Event::Input(input) => handle_input(input, &current_state),
+            let input_result = match rx.recv()? {
+                Event::Input(input) => input::handle_input(input, &current_state),
                 Event::Tick => continue,
             };
 
-            //deals with key events
-            {
-                let mut current_state_data = current_state.lock().unwrap();
+            //semaphore for inputs
+            let mut current_state = current_state.lock().unwrap();
+            //would move into closure, but can't direct control flow from inside closure
+            let input_result = match input_result {
+                Ok(result) => result,
+                Err(e) => {
+                    handle_errors(e, &mut terminal, &todo_items)?;
+                    continue;
+                }
+            };
 
-                let result = match input_result {
-                    Ok(result) => result,
-                    Err(e) => {
-                        handle_errors(e, &mut terminal, &todo_items)?;
-                        continue;
-                    }
-                };
+            match input_result {
+                //just change the state depending on user action
+                UserAction::Quit => *current_state = State::Quitting,
+                UserAction::AddTodo => *current_state = State::AddingTodo(AddState::EnteringName),
+                UserAction::CompeleteTodo => *current_state = State::CompletingTodo,
+                UserAction::UncompleteTodo => *current_state = State::UncompletingTodo,
+                UserAction::None => continue,
+                UserAction::ManipulateBuffer(action) => {
+                    let input_result = buffer::manipulate_buffer(
+                        &mut *current_state,
+                        action,
+                        &mut user_input_buffer,
+                        &mut name_storage_buff,
+                        &mut date_storage_buff,
+                        todo,
+                        &mut todo_items,
+                    );
 
-                match result {
-                    UserAction::View => {
-                        *current_state_data = State::Viewing;
-                        user_input_buffer = String::new();
-                    }
-                    UserAction::Input(input) => user_input_buffer.push(input),
-                    //handles user buffer input
-                    UserAction::SubmitBuffer => {
-                        if let Err(e) = submit_buffer(&current_state_data, &user_input_buffer[..], todo) {
+                    match input_result {
+                        Ok(()) => {}
+                        Err(e) => {
                             handle_errors(e, &mut terminal, &todo_items)?;
-                            *current_state_data = State::Viewing;
+                            *current_state = State::Viewing;
+                            date_storage_buff = String::new();
                             user_input_buffer = String::new();
+                            date_storage_buff = String::new();
                             continue;
                         }
-
-                        *current_state_data = State::Viewing;
-                        todo_items = generate_todo(todo);
-                        user_input_buffer = String::from("");
                     }
-                    UserAction::Backspace => {
-                        user_input_buffer.pop();
-                    }
-                    //just change the state depending on user action
-                    UserAction::Quit => *current_state_data = State::Quitting,
-                    UserAction::AddTodo => *current_state_data = State::AddingTodo,
-                    UserAction::CompeleteTodo => *current_state_data = State::CompletingTodo,
-                    UserAction::UncompleteTodo => *current_state_data = State::UncompletingTodo,
-                    UserAction::None => continue,
                 }
             }
-
             //render the correct state
-            {
-                let mut current_state_data = current_state.lock().unwrap();
-                match *current_state_data {
-                    State::Viewing => render_main(&mut terminal, BufferType::None, &todo_items)?,
-                    State::AddingTodo => render_adding(
+            render(
+                &mut current_state,
+                &user_input_buffer,
+                &todo_items,
+                &mut terminal,
+                &name_storage_buff,
+                &*date_storage_buff,
+            )?;
+        }
+    }
+
+    fn render(
+        current_state: &mut std::sync::MutexGuard<State>,
+        user_input_buffer: &String,
+        todo_items: &String,
+        mut terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+        storage_buff: &String,
+        date_storage_buff: &str,
+    ) -> ResultIo<()> {
+        match **current_state {
+            State::Viewing => {
+                render::render_main(&mut terminal, render::BufferType::None, &todo_items)?
+            }
+            State::AddingTodo(state) => {
+                use AddState::*;
+                match state {
+                    EnteringName => render::render_adding(
                         &mut terminal,
-                        user_input_buffer.as_str(),
+                        &*(user_input_buffer.to_owned() + "█"),
+                        "",
+                        "",
                         &todo_items,
-                        )?,
-                    State::CompletingTodo => render_main(
+                        &DateState::Year,
+                    )?,
+                    EnteringDate(state) => render::render_adding(
                         &mut terminal,
-                        BufferType::CompletingTask(&user_input_buffer),
+                        &storage_buff[..],
+                        &*(user_input_buffer.to_owned() + "█"),
+                        date_storage_buff,
                         &todo_items,
-                        )?,
-                    State::UncompletingTodo => render_main(
-                        &mut terminal,
-                        BufferType::UncompletingTask(&user_input_buffer),
-                        &todo_items,
-                        )?,
-                    State::Error => *current_state_data = State::Viewing,
-                    State::Quitting => {
-                        return Ok(());
-                    }
+                        &state,
+                    )?,
                 }
             }
-        }
-    }
-
-    fn capture_input(
-        sx: &Sender<Event<CEvent::KeyEvent>>,
-        current_tick_time: &mut Instant,
-    ) -> ResultIo<()> {
-        let event_timer = MAX_TICK_TIME
-            .checked_sub(current_tick_time.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
-
-        if CEvent::poll(event_timer).expect("Polling Doesn't Work") {
-            if let CEvent::Event::Key(key) = CEvent::read().expect("Reading Events Doesn't Work") {
-                sx.send(Event::Input(key)).expect("Sending Events");
+            State::CompletingTodo => render::render_main(
+                &mut terminal,
+                render::BufferType::CompletingTask(&user_input_buffer),
+                &todo_items,
+            )?,
+            State::UncompletingTodo => render::render_main(
+                &mut terminal,
+                render::BufferType::UncompletingTask(&user_input_buffer),
+                &todo_items,
+            )?,
+            State::Error => **current_state = State::Viewing,
+            State::Quitting => {
+                return Ok(());
             }
         }
-
-        if current_tick_time.elapsed() >= MAX_TICK_TIME {
-            match sx.send(Event::Tick) {
-                Ok(_) => *current_tick_time = Instant::now(),
-                Err(e) => eprintln!("{e}"),
-            }
-        }
-
-        Ok(())
+        return Ok(());
     }
 
-    fn handle_input(
-        input: CEvent::KeyEvent,
-        current_state: &Arc<Mutex<State>>,
-    ) -> ResultIo<UserAction> {
-        use crossterm::event::KeyCode;
-        let current_state_data = current_state.lock().unwrap();
-
-        //handles user actions in normal mode
-        if let State::Viewing = *current_state_data {
-            let key = match input.code {
-                KeyCode::Char(input) => input,
-                _ => return Ok(UserAction::None),
-            };
-
-            return match key {
-                'q' => Ok(UserAction::Quit),
-                'n' => Ok(UserAction::AddTodo),
-                'c' => Ok(UserAction::CompeleteTodo),
-                'u' => Ok(UserAction::UncompleteTodo),
-                _ => Ok(UserAction::None),
-            };
-        }
-
-        //handles user actions when in buffer mode
-        match input.code {
-            KeyCode::Char(input) => return Ok(UserAction::Input(input)),
-            KeyCode::Backspace => return Ok(UserAction::Backspace),
-            KeyCode::Enter => return Ok(UserAction::SubmitBuffer),
-            KeyCode::Esc => return Ok(UserAction::View),
-            _ => return Ok(UserAction::None),
-        };
-    }
-
-    fn generate_todo(todo: &TodoList) -> String {
+    pub fn generate_todo(todo: &TodoList) -> String {
         let mut todo_str = String::from("Todo:\n");
+        let time_now = chrono::offset::Local::now();
+        let mut timer: [i64; 3] = [0, 0, 0];
+
         todo.todo_items
             .iter()
             .enumerate()
             .for_each(|(index, item)| {
                 todo_str.push_str(&format!(
-                    "{index} - {item_name} [{completed}]\n",
+                    "{index} - {item_name} [{completed}]",
                     item_name = item.title,
                     completed = if !item.completed {
                         COMPLETED_ITEM[0]
@@ -263,6 +291,26 @@ pub mod tui_handler {
                         COMPLETED_ITEM[1]
                     }
                 ));
+
+                if let Some(due) = item.due_date {
+                    let due_duration = due
+                        .signed_duration_since(time_now.naive_local())
+                        .num_seconds();
+                    timer = [
+                        (due_duration / 60) % 60,      //mins
+                        (due_duration / 60) / 60 % 24, //hrs
+                        (due_duration / 60) / 60 / 24, //days
+                    ];
+                    todo_str.push_str(&format!(
+                        " | Due: D:{d:0>2} H:{h:0>2} M:{m:0>2}",
+                        d = timer[2],
+                        h = timer[1],
+                        m = timer[0],
+                    ));
+
+                    //todo_str.push_str(&format!(" | Due: {:?}", due_duration));
+                }
+                todo_str.push_str("\n");
             });
 
         todo_str.push_str("\n\nCompleted Todos:\n");
@@ -284,41 +332,7 @@ pub mod tui_handler {
         return todo_str;
     }
 
-    fn submit_buffer(
-        current_state_data: &State,
-        output_buffer: &str,
-        todo: &mut TodoList,
-    ) -> ResultIo<()> {
-        if let State::AddingTodo = *current_state_data { 
-            todo.add_item(&output_buffer)?;
-            return Ok(());
-        }
-        
-        let output_buffer = match output_buffer.parse::<usize>() {
-            Ok(r) => r,
-            Err(_) => return Err(ErrorKind::InvalidInput.into())
-        }; 
-
-        match *current_state_data {
-            State::CompletingTodo => {
-                if output_buffer > todo.todo_len() - 1 {
-                    return Err(ErrorKind::InvalidInput.into());
-                }
-                todo.complete_item(output_buffer)?;
-            },
-            State::UncompletingTodo => {
-                if output_buffer > todo.completed_len() - 1 {
-                    return Err(ErrorKind::InvalidInput.into());
-                }
-                todo.uncomplete_item(output_buffer)?;
-            }
-            _ => {}
-        }
-
-        return Ok(());
-    }
-
-    fn handle_errors(
+    pub fn handle_errors(
         e: io::Error,
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         todo_items: &String,
@@ -326,11 +340,27 @@ pub mod tui_handler {
         use ErrorKind::*;
         match e.kind() {
             InvalidInput => {
-                render_main(terminal, BufferType::Error("Invalid Input"), todo_items).unwrap();
+                render::render_main(
+                    terminal,
+                    render::BufferType::Error("Invalid Input"),
+                    todo_items,
+                )?;
                 return Ok(());
             }
-            InvalidData => { 
-                render_main(terminal, BufferType::Error("Invalid or Empty Data"), todo_items).unwrap();
+            InvalidData => {
+                render::render_main(
+                    terminal,
+                    render::BufferType::Error("Invalid or Empty Data"),
+                    todo_items,
+                )?;
+                return Ok(());
+            }
+            Unsupported => {
+                render::render_main(
+                    terminal,
+                    render::BufferType::Error("Invalid Date"),
+                    todo_items,
+                )?;
                 return Ok(());
             }
             _ => return Err(e),
