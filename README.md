@@ -16,8 +16,14 @@ There is currently only one mode: Command mode. By pressing the appropriate kind
 
 - q: Quits the app and returns your terminal to the normal mode.
 - n: Insert a new entry into your todo-list, by entering it's name into the buffer
+- d: Insert a new entry, with a date, into your todo-list. View the date Section below.
 - c: Completes a Todo item, enter the id of the item you want to complete into the buffer 
 - u: Uncompletes a Todo item, enter the id of the item you want to uncomplete into the buffer 
+
+## Dates
+Currently there are some issues with Date formatting, requiring you to be very specific with your input for it to be correctly parsed. The format should be: 
+Full-year (ex: 2023), Short-name for month (ex: Mar), Full-day (ex: 23), hours:minutes:seconds (12:00:00).\
+I will attempt to make it more user friendly in the future. 
 
 ## Dependencies
 Tui-rs: https://crates.io/crates/serde \

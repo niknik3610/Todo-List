@@ -50,6 +50,7 @@ pub fn handle_input(
         return match key {
             'q' => Ok(UserAction::Quit),
             'n' => Ok(UserAction::AddTodo),
+            'd' => Ok(UserAction::AddTodoDate),
             'c' => Ok(UserAction::CompeleteTodo),
             'u' => Ok(UserAction::UncompleteTodo),
             _ => Ok(UserAction::None),

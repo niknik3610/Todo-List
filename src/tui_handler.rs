@@ -7,7 +7,6 @@ pub mod tui_handler {
     use crate::tui_handler::{
         tui_buffer_handler as buffer, tui_input_handler as input, tui_rendering_handler as render,
     };
-    use chrono::Month;
     use crossterm::event as CEvent;
     use crossterm::execute;
     use crossterm::terminal::{
@@ -29,7 +28,7 @@ pub mod tui_handler {
     use tui::Terminal;
 
     pub const MAX_TICK_TIME: Duration = Duration::from_millis(200);
-    const COMPLETED_ITEM: [char; 2] = [' ', 'X'];
+    const COMPLETED_ITEM: [char; 2] = [' ', '✓'];
 
     type ResultIo<T> = Result<T, io::Error>;
 
@@ -41,7 +40,8 @@ pub mod tui_handler {
     pub enum State {
         Viewing,
         Quitting,
-        AddingTodo(AddState),
+        AddingTodoDate(AddState),
+        AddingTodo,
         CompletingTodo,
         UncompletingTodo,
         Error,
@@ -49,6 +49,7 @@ pub mod tui_handler {
 
     pub enum UserAction {
         Quit,
+        AddTodoDate,
         AddTodo,
         CompeleteTodo,
         UncompleteTodo,
@@ -182,7 +183,8 @@ pub mod tui_handler {
             match input_result {
                 //just change the state depending on user action
                 UserAction::Quit => *current_state = State::Quitting,
-                UserAction::AddTodo => *current_state = State::AddingTodo(AddState::EnteringName),
+                UserAction::AddTodo => *current_state = State::AddingTodo,
+                UserAction::AddTodoDate => *current_state = State::AddingTodoDate(AddState::EnteringName),
                 UserAction::CompeleteTodo => *current_state = State::CompletingTodo,
                 UserAction::UncompleteTodo => *current_state = State::UncompletingTodo,
                 UserAction::None => continue,
@@ -202,7 +204,6 @@ pub mod tui_handler {
                         Err(e) => {
                             handle_errors(e, &mut terminal, &todo_items)?;
                             *current_state = State::Viewing;
-                            date_storage_buff = String::new();
                             user_input_buffer = String::new();
                             date_storage_buff = String::new();
                             continue;
@@ -233,11 +234,14 @@ pub mod tui_handler {
         match **current_state {
             State::Viewing => {
                 render::render_main(&mut terminal, render::BufferType::None, &todo_items)?
-            }
-            State::AddingTodo(state) => {
+            },
+            State::AddingTodo => {
+                render::render_adding(terminal, &user_input_buffer, todo_items)?
+            },
+            State::AddingTodoDate(state) => {
                 use AddState::*;
                 match state {
-                    EnteringName => render::render_adding(
+                    EnteringName => render::render_adding_date(
                         &mut terminal,
                         &*(user_input_buffer.to_owned() + "█"),
                         "",
@@ -245,7 +249,7 @@ pub mod tui_handler {
                         &todo_items,
                         &DateState::Year,
                     )?,
-                    EnteringDate(state) => render::render_adding(
+                    EnteringDate(state) => render::render_adding_date(
                         &mut terminal,
                         &storage_buff[..],
                         &*(user_input_buffer.to_owned() + "█"),
@@ -274,7 +278,7 @@ pub mod tui_handler {
     }
 
     pub fn generate_todo(todo: &TodoList) -> String {
-        let mut todo_str = String::from("Todo:\n");
+        let mut todo_str = String::from("   Todo:\n");
         let time_now = chrono::offset::Local::now();
         let mut timer: [i64; 3] = [0, 0, 0];
 
@@ -283,7 +287,7 @@ pub mod tui_handler {
             .enumerate()
             .for_each(|(index, item)| {
                 todo_str.push_str(&format!(
-                    "{index} - {item_name} [{completed}]",
+                    "   {index} - {item_name} [{completed}]",
                     item_name = item.title,
                     completed = if !item.completed {
                         COMPLETED_ITEM[0]
@@ -313,13 +317,13 @@ pub mod tui_handler {
                 todo_str.push_str("\n");
             });
 
-        todo_str.push_str("\n\nCompleted Todos:\n");
+        todo_str.push_str("\n\n   Completed Todos:\n");
         todo.completed_items
             .iter()
             .enumerate()
             .for_each(|(index, item)| {
                 todo_str.push_str(&format!(
-                    "{index} - {item_name} [{completed}]\n",
+                    "   {index} - {item_name} {completed}\n",
                     item_name = item.title,
                     completed = if !item.completed {
                         COMPLETED_ITEM[0]
