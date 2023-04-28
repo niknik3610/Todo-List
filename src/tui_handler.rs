@@ -278,7 +278,7 @@ pub mod tui_handler {
     }
 
     pub fn generate_todo(todo: &TodoList) -> String {
-        let mut todo_str = String::from("Todo:\n");
+        let mut todo_str = String::from("   Todo:\n");
         let time_now = chrono::offset::Local::now();
         let mut timer: [i64; 3] = [0, 0, 0];
 
@@ -287,7 +287,7 @@ pub mod tui_handler {
             .enumerate()
             .for_each(|(index, item)| {
                 todo_str.push_str(&format!(
-                    "{index} - {item_name} [{completed}]",
+                    "   {index} - {item_name} [{completed}]",
                     item_name = item.title,
                     completed = if !item.completed {
                         COMPLETED_ITEM[0]
@@ -317,13 +317,13 @@ pub mod tui_handler {
                 todo_str.push_str("\n");
             });
 
-        todo_str.push_str("\n\nCompleted Todos:\n");
+        todo_str.push_str("\n\n   Completed Todos:\n");
         todo.completed_items
             .iter()
             .enumerate()
             .for_each(|(index, item)| {
                 todo_str.push_str(&format!(
-                    "{index} - {item_name} {completed}\n",
+                    "   {index} - {item_name} {completed}\n",
                     item_name = item.title,
                     completed = if !item.completed {
                         COMPLETED_ITEM[0]

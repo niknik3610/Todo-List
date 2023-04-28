@@ -38,12 +38,12 @@ pub fn render_main(
                 .margin(2)
                 .constraints(
                     [
-                        layout::Constraint::Length(3), //Adding
-                        layout::Constraint::Min(2),    //Content
-                        layout::Constraint::Length(3), //Footer
+                    layout::Constraint::Length(3), //Adding
+                    layout::Constraint::Min(2),    //Content
+                    layout::Constraint::Length(3), //Footer
                     ]
                     .as_ref(),
-                )
+                    )
                 .split(size);
 
             let header = widgets::Paragraph::new("TODO LIST")
@@ -51,42 +51,86 @@ pub fn render_main(
                 .alignment(layout::Alignment::Center)
                 .block(
                     widgets::Block::default()
-                        .borders(widgets::Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .border_type(widgets::BorderType::Plain),
-                );
+                    .borders(widgets::Borders::ALL)
+                    .style(Style::default().fg(Color::White))
+                    .border_type(widgets::BorderType::Plain),
+                    );
 
-            let content = widgets::Paragraph::new(todo_items.clone())
+            // let content = widgets::Paragraph::new(todo_items.clone())
+            //     .style(Style::default().fg(Color::LightCyan))
+            //     .alignment(layout::Alignment::Center)
+            //     .block(
+            //         widgets::Block::default()
+            //             .borders(widgets::Borders::ALL)
+            //             .style(Style::default().fg(Color::White))
+            //             .border_type(widgets::BorderType::Plain),
+            //     );
+            
+            const TODO_SIZE: u16 = 40;
+            let content = layout::Layout::default()
+                .direction(layout::Direction::Horizontal)
+                .margin(0)
+                .constraints(
+                    [
+                    layout::Constraint::Percentage((100 - TODO_SIZE)/2),
+                    layout::Constraint::Percentage(TODO_SIZE),
+                    layout::Constraint::Percentage((100 - TODO_SIZE)/2),
+                    ]
+                    .as_ref(),
+                    )
+                .split(chunks[1]);
+
+            let empty_left = widgets::Paragraph::new("")
                 .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Center)
+                .alignment(layout::Alignment::Left)
                 .block(
                     widgets::Block::default()
-                        .borders(widgets::Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .border_type(widgets::BorderType::Plain),
-                );
+                    .style(Style::default().fg(Color::White))
+                    .border_type(widgets::BorderType::Plain),
+                    );
+
+            let todos = widgets::Paragraph::new(todo_items.clone())
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(layout::Alignment::Left)
+                .block(
+                    widgets::Block::default()
+                    .borders(widgets::Borders::ALL)
+                    .style(Style::default().fg(Color::White))
+                    .border_type(widgets::BorderType::Rounded),
+                    );
+
+            let empty_right = widgets::Paragraph::new("")
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(layout::Alignment::Left)
+                .block(
+                    widgets::Block::default()
+                    .style(Style::default().fg(Color::White))
+                    .border_type(widgets::BorderType::Plain),
+                    );
 
             let command_buffer = widgets::Paragraph::new(command_contents)
                 .style(
                     Style::default()
-                        .fg(if let BufferType::Error(_) = buffer {
-                            Color::Red
-                        } else {
-                            Color::LightCyan
-                        })
-                        .add_modifier(Modifier::BOLD),
-                )
+                    .fg(if let BufferType::Error(_) = buffer {
+                        Color::Red
+                    } else {
+                        Color::LightCyan
+                    })
+                    .add_modifier(Modifier::BOLD),
+                    )
                 .alignment(layout::Alignment::Center)
                 .block(
                     widgets::Block::default()
-                        .borders(widgets::Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .title("Commands")
-                        .border_type(widgets::BorderType::Plain),
-                );
+                    .borders(widgets::Borders::ALL)
+                    .style(Style::default().fg(Color::White))
+                    .title("Commands")
+                    .border_type(widgets::BorderType::Plain),
+                    );
 
             rec.render_widget(header, chunks[0]);
-            rec.render_widget(content, chunks[1]);
+            rec.render_widget(empty_left, content[0]);
+            rec.render_widget(todos, content[1]);
+            rec.render_widget(empty_right, content[2]);
             rec.render_widget(command_buffer, chunks[2]);
         })
         .expect("Drawing TUI");
@@ -126,28 +170,39 @@ pub fn render_adding(
                         .border_type(widgets::BorderType::Plain),
                 );
 
+            const TODO_SIZE: u16 = 40;
             let content = layout::Layout::default()
                 .direction(layout::Direction::Horizontal)
                 .margin(0)
                 .constraints(
                     [
-                        layout::Constraint::Percentage(70),
-                        layout::Constraint::Percentage(30),
+                    layout::Constraint::Percentage((100 - TODO_SIZE)/2),
+                    layout::Constraint::Percentage(TODO_SIZE),
+                    layout::Constraint::Percentage((100 - TODO_SIZE)/2),
                     ]
                     .as_ref(),
-                )
+                    )
                 .split(chunks[1]);
+
+            let empty_left = widgets::Paragraph::new("")
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(layout::Alignment::Left)
+                .block(
+                    widgets::Block::default()
+                    .style(Style::default().fg(Color::White))
+                    .border_type(widgets::BorderType::Plain),
+                    );
 
             let todos = widgets::Paragraph::new(todo_items.clone())
                 .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Center)
+                .alignment(layout::Alignment::Left)
                 .block(
                     widgets::Block::default()
-                        .borders(widgets::Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .border_type(widgets::BorderType::Plain),
-                );
-
+                    .borders(widgets::Borders::ALL)
+                    .style(Style::default().fg(Color::White))
+                    .border_type(widgets::BorderType::Rounded),
+                    );
+ 
             let new_todo = widgets::Paragraph::new(todo_string)
                 .style(Style::default().fg(Color::LightCyan))
                 .alignment(layout::Alignment::Left)
@@ -175,8 +230,9 @@ pub fn render_adding(
                 );
 
             rec.render_widget(header, chunks[0]);
-            rec.render_widget(todos, content[0]);
-            rec.render_widget(new_todo, content[1]);
+            rec.render_widget(empty_left, content[0]);
+            rec.render_widget(todos, content[1]);
+            rec.render_widget(new_todo, content[2]);
             rec.render_widget(command_buffer, chunks[2]);
         })
         .expect("Drawing TUI");
@@ -226,27 +282,38 @@ pub fn render_adding_date(
                         .border_type(widgets::BorderType::Plain),
                 );
 
+            const TODO_SIZE: u16 = 40;
             let content = layout::Layout::default()
                 .direction(layout::Direction::Horizontal)
                 .margin(0)
                 .constraints(
                     [
-                        layout::Constraint::Percentage(70),
-                        layout::Constraint::Percentage(30),
+                    layout::Constraint::Percentage((100 - TODO_SIZE)/2),
+                    layout::Constraint::Percentage(TODO_SIZE),
+                    layout::Constraint::Percentage((100 - TODO_SIZE)/2),
                     ]
                     .as_ref(),
-                )
+                    )
                 .split(chunks[1]);
 
             let todos = widgets::Paragraph::new(todo_items.clone())
                 .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Center)
+                .alignment(layout::Alignment::Left)
                 .block(
                     widgets::Block::default()
-                        .borders(widgets::Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .border_type(widgets::BorderType::Plain),
-                );
+                    .borders(widgets::Borders::ALL)
+                    .style(Style::default().fg(Color::White))
+                    .border_type(widgets::BorderType::Rounded),
+                    );
+
+            let empty_left = widgets::Paragraph::new("")
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(layout::Alignment::Left)
+                .block(
+                    widgets::Block::default()
+                    .style(Style::default().fg(Color::White))
+                    .border_type(widgets::BorderType::Plain),
+                    );
 
             let new_todo = widgets::Paragraph::new(todo_string)
                 .style(Style::default().fg(Color::LightCyan))
@@ -275,8 +342,9 @@ pub fn render_adding_date(
                 );
 
             rec.render_widget(header, chunks[0]);
-            rec.render_widget(todos, content[0]);
-            rec.render_widget(new_todo, content[1]);
+            rec.render_widget(empty_left, content[0]);
+            rec.render_widget(todos, content[1]);
+            rec.render_widget(new_todo, content[2]);
             rec.render_widget(command_buffer, chunks[2]);
         })
         .expect("Drawing TUI");
