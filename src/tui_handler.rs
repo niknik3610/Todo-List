@@ -40,7 +40,8 @@ pub mod tui_handler {
     pub enum State {
         Viewing,
         Quitting,
-        AddingTodo(AddState),
+        AddingTodoDate(AddState),
+        AddingTodo,
         CompletingTodo,
         UncompletingTodo,
         Error,
@@ -48,6 +49,7 @@ pub mod tui_handler {
 
     pub enum UserAction {
         Quit,
+        AddTodoDate,
         AddTodo,
         CompeleteTodo,
         UncompleteTodo,
@@ -181,7 +183,8 @@ pub mod tui_handler {
             match input_result {
                 //just change the state depending on user action
                 UserAction::Quit => *current_state = State::Quitting,
-                UserAction::AddTodo => *current_state = State::AddingTodo(AddState::EnteringName),
+                UserAction::AddTodo => *current_state = State::AddingTodo,
+                UserAction::AddTodoDate => *current_state = State::AddingTodoDate(AddState::EnteringName),
                 UserAction::CompeleteTodo => *current_state = State::CompletingTodo,
                 UserAction::UncompleteTodo => *current_state = State::UncompletingTodo,
                 UserAction::None => continue,
@@ -231,11 +234,14 @@ pub mod tui_handler {
         match **current_state {
             State::Viewing => {
                 render::render_main(&mut terminal, render::BufferType::None, &todo_items)?
-            }
-            State::AddingTodo(state) => {
+            },
+            State::AddingTodo => {
+                render::render_adding(terminal, &user_input_buffer, todo_items)?
+            },
+            State::AddingTodoDate(state) => {
                 use AddState::*;
                 match state {
-                    EnteringName => render::render_adding(
+                    EnteringName => render::render_adding_date(
                         &mut terminal,
                         &*(user_input_buffer.to_owned() + "█"),
                         "",
@@ -243,7 +249,7 @@ pub mod tui_handler {
                         &todo_items,
                         &DateState::Year,
                     )?,
-                    EnteringDate(state) => render::render_adding(
+                    EnteringDate(state) => render::render_adding_date(
                         &mut terminal,
                         &storage_buff[..],
                         &*(user_input_buffer.to_owned() + "█"),

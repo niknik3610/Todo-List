@@ -9,17 +9,23 @@ pub fn submit_buffer(
     date_storage_buff: &String,
     todo: &mut TodoList,
 ) -> io::Result<()> {
-    if let State::AddingTodo(state) = *current_state_data {
-        match state {
-            AddState::EnteringName => todo.add_item(&output_buffer)?,
-            AddState::EnteringDate(_) => {
-                // todo.add_item(&*format!("'{date_storage_buff}'"))?;
-                todo.add_item_with_date(&output_buffer, &*date_storage_buff)?
-            }
-        };
-        return Ok(());
+    match *current_state_data {
+        State::AddingTodo => {
+            todo.add_item(output_buffer)?;
+        },
+        State::AddingTodoDate(state) => {
+            match state {
+                AddState::EnteringName => todo.add_item(&output_buffer)?,
+                AddState::EnteringDate(_) => {
+                    // todo.add_item(&*format!("'{date_storage_buff}'"))?;
+                    todo.add_item_with_date(&output_buffer, &*date_storage_buff)?
+                }
+            };
+        }
+        _ => return Err(ErrorKind::InvalidInput.into())
+
     }
-    return Err(ErrorKind::InvalidInput.into());
+    return Ok(());
 }
 
 pub fn submit_command(
@@ -87,12 +93,18 @@ fn match_buffer_submit(
     todo_items: &mut String,
 ) -> io::Result<()> {
     match *current_state {
-        State::AddingTodo(AddState::EnteringName) => {
+        State::AddingTodo => {
+            submit_buffer(&current_state, &user_input_buffer, date_storage_buff, todo)?;
+            *todo_items = generate_todo(todo);
+            *current_state = State::Viewing;
+            *user_input_buffer = String::new();
+        }
+        State::AddingTodoDate(AddState::EnteringName) => {
             swap_buffers(&user_input_buffer, &mut *name_storage_buff)?;
             *user_input_buffer = String::new();
-            *current_state = State::AddingTodo(AddState::EnteringDate(DateState::Year));
+            *current_state = State::AddingTodoDate(AddState::EnteringDate(DateState::Year));
         }
-        State::AddingTodo(AddState::EnteringDate(state)) => {
+        State::AddingTodoDate(AddState::EnteringDate(state)) => {
             if let DateState::Time = state {
                 *date_storage_buff += &*(user_input_buffer);
                 submit_buffer(
@@ -109,7 +121,7 @@ fn match_buffer_submit(
                 *date_storage_buff = String::new();
             } else {
                 *date_storage_buff += &*(user_input_buffer.to_owned() + " ");
-                *current_state = State::AddingTodo(AddState::EnteringDate(state.next().unwrap()));
+                *current_state = State::AddingTodoDate(AddState::EnteringDate(state.next().unwrap()));
                 *user_input_buffer = String::new();
             }
         }

@@ -54,14 +54,23 @@ pub mod todo {
         }
 
         pub fn complete_item(&mut self, item_id: usize) -> ResultIo<()> {
+            if self.todo_items.len() < 1 {
+                return Err(ErrorKind::InvalidInput.into());
+            }
+
             if item_id > self.todo_items.len() - 1 {
                 return Err(ErrorKind::InvalidInput.into());
             }
+
             self.todo_items[item_id].completed = true;
             self.completed_items.push(self.todo_items.remove(item_id));
             return Ok(());
         }
         pub fn uncomplete_item(&mut self, item_id: usize) -> ResultIo<()> {
+            if self.completed_items.len() < 1 {
+                return Err(ErrorKind::InvalidInput.into());
+            }
+
             if item_id > self.completed_items.len() - 1 {
                 return Err(ErrorKind::InvalidInput.into());
             }
