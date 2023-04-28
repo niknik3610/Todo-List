@@ -17,6 +17,17 @@ pub enum BufferType<'a> {
     Error(&'a str),
 }
 
+pub struct TodoItems {
+    pub indexes: String,
+    pub todo_content: String,
+    pub check_boxes: String,
+}
+impl TodoItems {
+    pub fn new(indexes: String, todo_content: String, check_boxes: String) -> TodoItems {
+        TodoItems {indexes, todo_content, check_boxes} 
+    }
+}
+
 pub fn render_main(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     buffer: BufferType,
