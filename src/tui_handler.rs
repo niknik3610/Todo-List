@@ -290,9 +290,9 @@ pub mod tui_handler {
             .enumerate()
             .for_each(|(index, item)| {
                 //todo items
-                indexes.push_str(&*format!("{index}\n"));
+                indexes.push_str(&*format!(" {index}\n"));
                 todos.push_str(&*format!("{item_name}", item_name = item.title));
-                completions.push_str(&*format!("[{completed}]", completed = COMPLETED_ITEM[0]));
+                completions.push_str(&*format!("[{completed}]  \n", completed = COMPLETED_ITEM[0]));
 
                 if let Some(due) = item.due_date {
                     let due_duration = due
@@ -325,9 +325,9 @@ pub mod tui_handler {
             .iter()
             .enumerate()
             .for_each(|(index, item)| {
-                indexes.push_str(&*format!("{index}\n"));
+                indexes.push_str(&*format!(" {index}\n"));
                 todos.push_str(&*format!("{item_name}", item_name = item.title));
-                completions.push_str(&*format!("[{completed}]", completed = COMPLETED_ITEM[1]));
+                completions.push_str(&*format!("[{completed}]  \n", completed = COMPLETED_ITEM[1]));
         });
         
         return render::TodoItems::new(indexes, todos, completions);
