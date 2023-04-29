@@ -1,13 +1,13 @@
 use std::io::{self, Stdout};
-
 use tui::{
     backend::CrosstermBackend,
-    layout,
+    layout::{self, Rect},
     style::{Color, Modifier, Style},
-    widgets, Terminal,
+    widgets::{self, Paragraph}, Terminal,
 };
-
 use super::tui_handler::DateState;
+
+const TODO_SIZE: u16 = 40;
 
 pub enum BufferType<'a> {
     None,
@@ -17,6 +17,7 @@ pub enum BufferType<'a> {
     Error(&'a str),
 }
 
+#[derive(Clone)]
 pub struct TodoItems {
     pub indexes: String,
     pub todo_content: String,
@@ -31,7 +32,7 @@ impl TodoItems {
 pub fn render_main(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     buffer: BufferType,
-    todo_items: &String,
+    todo_items: &TodoItems,
 ) -> io::Result<()> {
     let command_contents = match buffer {
         BufferType::None => "Command Mode".to_owned(),
@@ -151,7 +152,7 @@ pub fn render_main(
 pub fn render_adding(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     name_buffer: &str,
-    todo_items: &String,
+    todo_items: &TodoItems,
 ) -> io::Result<()> {
     let todo_string = format!(" Task Name: {name_buffer}\n ");
     
@@ -255,7 +256,7 @@ pub fn render_adding_date(
     name_buffer: &str,
     date_buffer: &str,
     date_storage_buff: &str,
-    todo_items: &String,
+    todo_items: &TodoItems,
     date_state: &DateState,
 ) -> io::Result<()> {
     let mut todo_string = format!(" Task Name: {name_buffer}\n ");
@@ -293,30 +294,10 @@ pub fn render_adding_date(
                         .border_type(widgets::BorderType::Plain),
                 );
 
-            const TODO_SIZE: u16 = 40;
-            let content = layout::Layout::default()
-                .direction(layout::Direction::Horizontal)
-                .margin(0)
-                .constraints(
-                    [
-                    layout::Constraint::Percentage((100 - TODO_SIZE)/2),
-                    layout::Constraint::Percentage(TODO_SIZE),
-                    layout::Constraint::Percentage((100 - TODO_SIZE)/2),
-                    ]
-                    .as_ref(),
-                    )
-                .split(chunks[1]);
+            let content: Vec<Rect> = Vec::new();
 
-            let todos = widgets::Paragraph::new(todo_items.clone())
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Left)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(Style::default().fg(Color::White))
-                    .border_type(widgets::BorderType::Rounded),
-                    );
-
+            generate_content(&mut content, &chunks, todo_items);
+            
             let empty_left = widgets::Paragraph::new("")
                 .style(Style::default().fg(Color::LightCyan))
                 .alignment(layout::Alignment::Left)
@@ -360,4 +341,66 @@ pub fn render_adding_date(
         })
         .expect("Drawing TUI");
     Ok(())
+}
+
+fn generate_content<'a>(
+    chunks: &Vec<Rect>,
+    todo_items: &TodoItems) -> io::Result<(Vec<Rect>,Paragraph, Paragraph, Paragraph)> {
+    let content = layout::Layout::default()
+        .direction(layout::Direction::Horizontal)
+        .margin(0)
+        .constraints(
+            [
+            layout::Constraint::Percentage((100 - TODO_SIZE)/2),
+            layout::Constraint::Percentage(TODO_SIZE),
+            layout::Constraint::Percentage((100 - TODO_SIZE)/2),
+            ]
+            .as_ref(),
+            )
+        .split(chunks[1]);
+
+    const MARGIN_SIZE: u16 = 10;
+    let todos = layout::Layout::default()
+        .direction(layout::Direction::Horizontal)
+        .margin(0)
+        .constraints(
+            [
+            layout::Constraint::Percentage(MARGIN_SIZE),
+            layout::Constraint::Percentage(100 - (MARGIN_SIZE * 2)),
+            layout::Constraint::Percentage(MARGIN_SIZE),
+            ]
+            .as_ref(),
+            )
+        .split(content[1]);
+    
+    let indexes = widgets::Paragraph::new(todo_items.indexes)
+        .style(Style::default().fg(Color::LightCyan))
+        .alignment(layout::Alignment::Center)
+        .block(
+            widgets::Block::default()
+            .borders(widgets::Borders::RIGHT)
+            .style(Style::default().fg(Color::White))
+            .border_type(widgets::BorderType::Plain),
+            );
+ 
+    let todos = widgets::Paragraph::new(todo_items.todo_content)
+    .style(Style::default().fg(Color::LightCyan))
+    .alignment(layout::Alignment::Left)
+    .block(
+        widgets::Block::default()
+        .borders(widgets::Borders::NONE)
+        .style(Style::default().fg(Color::White))
+        .border_type(widgets::BorderType::Plain),
+        );
+
+    let completions = widgets::Paragraph::new(todo_items.check_boxes)
+    .style(Style::default().fg(Color::LightCyan))
+    .alignment(layout::Alignment::Center)
+    .block(
+        widgets::Block::default()
+        .borders(widgets::Borders::LEFT)
+        .style(Style::default().fg(Color::White))
+        .border_type(widgets::BorderType::Plain),
+        ); 
+    return Ok((content, indexes, todos, completions));
 }

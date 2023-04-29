@@ -1,6 +1,6 @@
 use crate::todo_backend::todo::TodoList;
 
-use super::tui_handler::{generate_todo, AddState, BufferAction, DateState, State};
+use super::{tui_handler::{generate_todo, AddState, BufferAction, DateState, State}, tui_rendering_handler::TodoItems};
 use std::io::{self, ErrorKind};
 
 pub fn submit_buffer(
@@ -57,7 +57,7 @@ pub fn manipulate_buffer(
     name_storage_buff: &mut String,
     date_storage_buff: &mut String,
     todo: &mut TodoList,
-    todo_items: &mut String,
+    todo_items: &mut TodoItems,
 ) -> io::Result<()> {
     match action {
         BufferAction::Input(input) => user_input_buffer.push(input),
@@ -90,7 +90,7 @@ fn match_buffer_submit(
     name_storage_buff: &mut String,
     date_storage_buff: &mut String,
     todo: &mut TodoList,
-    todo_items: &mut String,
+    todo_items: &mut TodoItems,
 ) -> io::Result<()> {
     match *current_state {
         State::AddingTodo => {
