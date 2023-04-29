@@ -226,14 +226,14 @@ pub mod tui_handler {
     fn render(
         current_state: &mut std::sync::MutexGuard<State>,
         user_input_buffer: &String,
-        todo_items: &String,
+        todo_items: &render::TodoItems,
         mut terminal: &mut Terminal<CrosstermBackend<Stdout>>,
         storage_buff: &String,
         date_storage_buff: &str,
     ) -> ResultIo<()> {
         match **current_state {
             State::Viewing => {
-                render::render_main(&mut terminal, render::BufferType::None, &todo_items)?
+                render::render_main(&mut terminal, render::BufferType::None, todo_items)?
             },
             State::AddingTodo => {
                 render::render_adding(terminal, &user_input_buffer, todo_items)?
@@ -277,8 +277,11 @@ pub mod tui_handler {
         return Ok(());
     }
 
-    pub fn generate_todo(todo: &TodoList) -> String {
-        let mut todo_str = String::from("   Todo:\n");
+    pub fn generate_todo(todo: &TodoList) -> render::TodoItems {
+        let mut indexes = String::from("\n");
+        let mut todos = String::from("Todo:\n");
+        let mut completions = String::from("\n");
+
         let time_now = chrono::offset::Local::now();
         let mut timer: [i64; 3] = [0, 0, 0];
 
@@ -286,15 +289,10 @@ pub mod tui_handler {
             .iter()
             .enumerate()
             .for_each(|(index, item)| {
-                todo_str.push_str(&format!(
-                    "   {index} - {item_name} [{completed}]",
-                    item_name = item.title,
-                    completed = if !item.completed {
-                        COMPLETED_ITEM[0]
-                    } else {
-                        COMPLETED_ITEM[1]
-                    }
-                ));
+                //todo items
+                indexes.push_str(&*format!(" {index}\n"));
+                todos.push_str(&*format!("{item_name}", item_name = item.title));
+                completions.push_str(&*format!("[{completed}]  \n", completed = COMPLETED_ITEM[0]));
 
                 if let Some(due) = item.due_date {
                     let due_duration = due
@@ -305,41 +303,40 @@ pub mod tui_handler {
                         (due_duration / 60) / 60 % 24, //hrs
                         (due_duration / 60) / 60 / 24, //days
                     ];
-                    todo_str.push_str(&format!(
-                        " | Due: D:{d:0>2} H:{h:0>2} M:{m:0>2}",
-                        d = timer[2],
-                        h = timer[1],
-                        m = timer[0],
-                    ));
+                    todos.push_str(&format!(
+                            " | Due: D:{d:0>2} H:{h:0>2} M:{m:0>2}",
+                            d = timer[2],
+                            h = timer[1],
+                            m = timer[0],
+                            ));
 
                     //todo_str.push_str(&format!(" | Due: {:?}", due_duration));
                 }
-                todo_str.push_str("\n");
+                todos.push_str("\n");
             });
 
-        todo_str.push_str("\n\n   Completed Todos:\n");
+
+        //completed items
+        indexes.push_str("\n\n\n");
+        todos.push_str("\n\nCompleted Todos:\n");
+        completions.push_str("\n\n\n");
+        
         todo.completed_items
             .iter()
             .enumerate()
             .for_each(|(index, item)| {
-                todo_str.push_str(&format!(
-                    "   {index} - {item_name} {completed}\n",
-                    item_name = item.title,
-                    completed = if !item.completed {
-                        COMPLETED_ITEM[0]
-                    } else {
-                        COMPLETED_ITEM[1]
-                    }
-                ));
-            });
-
-        return todo_str;
+                indexes.push_str(&*format!(" {index}\n"));
+                todos.push_str(&*format!("{item_name}", item_name = item.title));
+                completions.push_str(&*format!("[{completed}]  \n", completed = COMPLETED_ITEM[1]));
+        });
+        
+        return render::TodoItems::new(indexes, todos, completions);
     }
 
     pub fn handle_errors(
         e: io::Error,
         terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-        todo_items: &String,
+        todo_items: &render::TodoItems,
     ) -> ResultIo<()> {
         use ErrorKind::*;
         match e.kind() {
@@ -347,7 +344,7 @@ pub mod tui_handler {
                 render::render_main(
                     terminal,
                     render::BufferType::Error("Invalid Input"),
-                    todo_items,
+                    &todo_items,
                 )?;
                 return Ok(());
             }
