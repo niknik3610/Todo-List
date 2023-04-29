@@ -5,8 +5,11 @@ mod tui_rendering_handler;
 pub mod tui_handler {
     use crate::todo_backend::todo::TodoList;
     use crate::tui_handler::{
-        tui_buffer_handler as buffer, tui_input_handler as input, tui_rendering_handler as render,
+        tui_buffer_handler as buffer,
+        tui_input_handler as input,
+        tui_rendering_handler as render,
     };
+    use crate::parsing_handler;
     use crossterm::event as CEvent;
     use crossterm::execute;
     use crossterm::terminal::{

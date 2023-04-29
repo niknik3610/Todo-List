@@ -91,7 +91,7 @@ fn match_buffer_submit(
     date_storage_buff: &mut String,
     todo: &mut TodoList,
     todo_items: &mut TodoItems,
-) -> io::Result<()> {
+) -> io::Result<()> {     
     match *current_state {
         State::AddingTodo => {
             submit_buffer(&current_state, &user_input_buffer, date_storage_buff, todo)?;
