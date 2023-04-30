@@ -11,6 +11,7 @@ const TODO_SIZE: u16 = 30;
 
 pub enum BufferType<'a> {
     None,
+    EnteringCommand(&'a str),
     AddingTask(&'a str),
     CompletingTask(&'a str),
     UncompletingTask(&'a str),
@@ -39,6 +40,7 @@ pub fn render_main(
         BufferType::AddingTask(b) => "Adding: ".to_owned() + b,
         BufferType::CompletingTask(b) => "CompletingTask: ".to_owned() + b,
         BufferType::UncompletingTask(b) => "UncompletingTask: ".to_owned() + b,
+        BufferType::EnteringCommand(b) => "Command: ".to_owned() + b,
         BufferType::Error(e) => "Error: ".to_owned() + e,
     };
 

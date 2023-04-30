@@ -5,8 +5,11 @@ mod tui_rendering_handler;
 pub mod tui_handler {
     use crate::todo_backend::todo::TodoList;
     use crate::tui_handler::{
-        tui_buffer_handler as buffer, tui_input_handler as input, tui_rendering_handler as render,
+        tui_buffer_handler as buffer,
+        tui_input_handler as input,
+        tui_rendering_handler as render,
     };
+    use crate::parsing_handler;
     use crossterm::event as CEvent;
     use crossterm::execute;
     use crossterm::terminal::{
@@ -38,6 +41,7 @@ pub mod tui_handler {
     }
 
     pub enum State {
+        EnteringCommand,
         Viewing,
         Quitting,
         AddingTodoDate(AddState),
@@ -48,6 +52,7 @@ pub mod tui_handler {
     }
 
     pub enum UserAction {
+        Command,
         Quit,
         AddTodoDate,
         AddTodo,
@@ -182,6 +187,7 @@ pub mod tui_handler {
 
             match input_result {
                 //just change the state depending on user action
+                UserAction::Command => *current_state = State::EnteringCommand,
                 UserAction::Quit => *current_state = State::Quitting,
                 UserAction::AddTodo => *current_state = State::AddingTodo,
                 UserAction::AddTodoDate => *current_state = State::AddingTodoDate(AddState::EnteringName),
@@ -234,6 +240,12 @@ pub mod tui_handler {
         match **current_state {
             State::Viewing => {
                 render::render_main(&mut terminal, render::BufferType::None, todo_items)?
+            },
+            State::EnteringCommand => {
+                render::render_main(
+                    terminal,
+                    render::BufferType::EnteringCommand(&user_input_buffer),
+                    todo_items)?
             },
             State::AddingTodo => {
                 render::render_adding(terminal, &user_input_buffer, todo_items)?
@@ -326,7 +338,7 @@ pub mod tui_handler {
             .enumerate()
             .for_each(|(index, item)| {
                 indexes.push_str(&*format!(" {index}\n"));
-                todos.push_str(&*format!("{item_name}", item_name = item.title));
+                todos.push_str(&*format!("{item_name}\n", item_name = item.title));
                 completions.push_str(&*format!("[{completed}]  \n", completed = COMPLETED_ITEM[1]));
         });
         

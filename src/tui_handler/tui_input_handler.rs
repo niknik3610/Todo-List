@@ -48,6 +48,7 @@ pub fn handle_input(
         };
 
         return match key {
+            ':' => Ok(UserAction::Command),
             'q' => Ok(UserAction::Quit),
             'n' => Ok(UserAction::AddTodo),
             'd' => Ok(UserAction::AddTodoDate),

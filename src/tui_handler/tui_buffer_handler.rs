@@ -1,6 +1,19 @@
 use crate::todo_backend::todo::TodoList;
+use crate::parsing_handler::{
+    parse,
+    handle_command,
+};
 
-use super::{tui_handler::{generate_todo, AddState, BufferAction, DateState, State}, tui_rendering_handler::TodoItems};
+use super::{
+    tui_handler::{
+        generate_todo,
+        AddState,
+        BufferAction,
+        DateState,
+        State
+    },
+    tui_rendering_handler::TodoItems, 
+};
 use std::io::{self, ErrorKind};
 
 pub fn submit_buffer(
@@ -24,28 +37,6 @@ pub fn submit_buffer(
         }
         _ => return Err(ErrorKind::InvalidInput.into())
 
-    }
-    return Ok(());
-}
-
-pub fn submit_command(
-    current_state_data: &State,
-    output_buffer: &str,
-    todo: &mut TodoList,
-) -> io::Result<()> {
-    let output_buffer = match output_buffer.parse::<usize>() {
-        Ok(r) => r,
-        Err(_) => return Err(ErrorKind::InvalidInput.into()),
-    };
-
-    match *current_state_data {
-        State::CompletingTodo => {
-            todo.complete_item(output_buffer)?;
-        }
-        State::UncompletingTodo => {
-            todo.uncomplete_item(output_buffer)?;
-        }
-        _ => {}
     }
     return Ok(());
 }
@@ -91,7 +82,7 @@ fn match_buffer_submit(
     date_storage_buff: &mut String,
     todo: &mut TodoList,
     todo_items: &mut TodoItems,
-) -> io::Result<()> {
+) -> io::Result<()> {     
     match *current_state {
         State::AddingTodo => {
             submit_buffer(&current_state, &user_input_buffer, date_storage_buff, todo)?;
@@ -127,8 +118,7 @@ fn match_buffer_submit(
         }
         //commands go here (will probably move this out at some point
         _ => {
-            submit_command(&*current_state, &user_input_buffer, todo)?;
-            *current_state = State::Viewing;
+            submit_command(&mut *current_state, &user_input_buffer, todo)?;
             *todo_items = generate_todo(todo);
             *user_input_buffer = String::from("");
         }
@@ -136,6 +126,35 @@ fn match_buffer_submit(
     return Ok(());
 }
 
+pub fn submit_command(
+    current_state: &mut State,
+    output_buffer: &str,
+    todo: &mut TodoList,
+) -> io::Result<()> {
+    if let State::EnteringCommand = current_state {
+        let parsed = parse(output_buffer)?; 
+        *current_state = handle_command(parsed)?;
+        return Ok(());
+    }
+
+    let output_buffer = match output_buffer.parse::<usize>() {
+        Ok(r) => r,
+        Err(_) => return Err(ErrorKind::InvalidInput.into()),
+    };
+
+    match *current_state {
+        State::CompletingTodo => {
+            todo.complete_item(output_buffer)?;
+        }
+        State::UncompletingTodo => {
+            todo.uncomplete_item(output_buffer)?;
+        } 
+        _ => {}
+    }
+
+    *current_state = State::Viewing;
+    return Ok(());
+}
 pub fn swap_buffers(prev_buff: &str, storage_buff: &mut String) -> io::Result<()> {
     *storage_buff = prev_buff.to_string();
     return Ok(());
