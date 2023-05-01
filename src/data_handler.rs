@@ -1,5 +1,5 @@
 pub mod data_handler {
-    use crate::todo_backend::todo::TodoList;
+    use crate::todo_backend::todo::{TodoList, TodoItem};
     use std::{
         fs::File,
         io::{self, Read, Write},
@@ -16,7 +16,8 @@ pub mod data_handler {
         let mut file_contents = String::new();
         file.read_to_string(&mut file_contents)?;
 
-        let todo = serde_json::from_str(&file_contents)?;
+        let mut todo: TodoList = serde_json::from_str(&file_contents)?;
+        todo.completed_items = Vec::new();
         return Ok(todo);
     }
 
