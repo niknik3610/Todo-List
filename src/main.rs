@@ -7,9 +7,6 @@ mod tui_handler;
 mod parsing_handler;
 
 fn main() {
-    // let parsed = parsing_handler::parse("").unwrap();
-    // println!("{:?}", parsed);
-
     env::set_var("RUST_BACKTRACE", "1");
     
     //error handling the load file
