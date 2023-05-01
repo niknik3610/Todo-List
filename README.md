@@ -12,17 +12,27 @@ cargo build --release
 You can find the built app in the target/release directory within your project folder. Just open it through your terminal.
 
 ## KeyBinds
-There is currently only one mode: Command mode. By pressing the appropriate kindbind (view below), your keystrokes will be entered into a buffer in the command bar at the bottom of the screen. Press escape to delete the current buffer, or enter to complete your entry. These are the current keybinds (plan is for them to be remapable in the future):
+There are currently only two modes: Command mode and new Task Mode. In command mode, by pressing the appropriate kindbind (view below), your keystrokes will be entered into a buffer in the command bar at the bottom of the screen. Press escape to delete the current buffer, or enter to complete your entry. New Task mode lets you create a new task in the window.
 
+These are the current keybinds available in command mode (plan is for them to be remapable in the future):
+- ":": Enter Command Mode (View Commands Section Below).
 - q: Quits the app and returns your terminal to the normal mode.
-- n: Insert a new entry into your todo-list, by entering it's name into the buffer
+- n: Insert a new entry into your todo-list, by entering it's name into the buffer.
 - d: Insert a new entry, with a date, into your todo-list. View the date Section below.
-- c: Completes a Todo item, enter the id of the item you want to complete into the buffer 
-- u: Uncompletes a Todo item, enter the id of the item you want to uncomplete into the buffer 
+- c: Completes a Todo item, enter the id of the item you want to complete into the buffer.
+- u: Uncompletes a Todo item, enter the id of the item you want to uncomplete into the buffer. 
+
+## Commands:
+- 'AddTask'
+- 'AddTaskDate'
+- 'CompleteTask' 
+- 'UncompleteTask'
+- 'Quit'
 
 ## Dates
 Currently there are some issues with Date formatting, requiring you to be very specific with your input for it to be correctly parsed. The format should be: 
 Full-year (ex: 2023), Short-name for month (ex: Mar), Full-day (ex: 23), hours:minutes:seconds (12:00:00).\
+Full input might look like: May 12 2023 12:00:00 \
 I will attempt to make it more user friendly in the future. 
 
 ## Dependencies
