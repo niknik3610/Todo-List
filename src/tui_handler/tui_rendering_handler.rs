@@ -29,6 +29,64 @@ impl TodoItems {
         TodoItems {indexes, todo_content, check_boxes} 
     }
 }
+macro_rules! generate_page_section {
+    () => {
+        widgets::Paragraph::new("")
+            .style(Style::default().fg(Color::LightCyan))
+            .alignment(layout::Alignment::Center)
+            .block(
+                widgets::Block::default()
+                .borders(widgets::Borders::NONE)
+                .style(Style::default().fg(Color::White))
+                .border_type(widgets::BorderType::Plain),
+                )
+    };
+    ($text: literal) => {
+        widgets::Paragraph::new($text)
+            .style(Style::default().fg(Color::LightCyan))
+            .alignment(layout::Alignment::Center)
+            .block(
+                widgets::Block::default()
+                .borders(widgets::Borders::ALL)
+                .style(Style::default().fg(Color::White))
+                .border_type(widgets::BorderType::Plain),
+                )
+    };
+    ($text: ident) => {
+        widgets::Paragraph::new($text)
+            .style(Style::default().fg(Color::LightCyan))
+            .alignment(layout::Alignment::Center)
+            .block(
+                widgets::Block::default()
+                .borders(widgets::Borders::ALL)
+                .style(Style::default().fg(Color::White))
+                .border_type(widgets::BorderType::Plain),
+                )
+    };
+    ($text: ident, $text_color: ident) => {
+        widgets::Paragraph::new($text)
+            .style(Style::default().fg($text_color))
+            .alignment(layout::Alignment::Center)
+            .block(
+                widgets::Block::default()
+                .borders(widgets::Borders::ALL)
+                .style(Style::default().fg(Color::White))
+                .border_type(widgets::BorderType::Plain),
+                )
+    };
+    ($text: ident, $section_title: literal, $color: ident) => {
+        widgets::Paragraph::new($text)
+            .style(Style::default().fg(Color::LightCyan))
+            .alignment(layout::Alignment::Center)
+            .block(
+                widgets::Block::default()
+                .borders(widgets::Borders::ALL)
+                .title($section_title)
+                .style(Style::default().fg($color))
+                .border_type(widgets::BorderType::Plain),
+                )
+    }
+}
 
 pub fn render_main(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
@@ -62,57 +120,21 @@ pub fn render_main(
 
             let (content, todo_content, indexes, todos, completions) =   
                 generate_content(&chunks, todo_items).unwrap();
- 
-            let header = widgets::Paragraph::new("TODO LIST")
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(Style::default().fg(Color::White))
-                    .border_type(widgets::BorderType::Plain),
-                    );
-   
-            let empty_left = widgets::Paragraph::new("")
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Left)
-                .block(
-                    widgets::Block::default()
-                    .style(Style::default().fg(Color::White))
-                    .border_type(widgets::BorderType::Plain),
-                    );
- 
-            let empty_right = widgets::Paragraph::new("")
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Left)
-                .block(
-                    widgets::Block::default()
-                    .style(Style::default().fg(Color::White))
-                    .border_type(widgets::BorderType::Plain),
-                    );
 
-            let command_buffer = widgets::Paragraph::new(command_contents)
-                .style(
-                    Style::default()
-                    .fg(if let BufferType::Error(_) = buffer {
-                        Color::Red
-                    } else {
-                        Color::LightCyan
-                    })
-                    .add_modifier(Modifier::BOLD),
-                    )
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(Style::default().fg(Color::White))
-                    .title("Commands")
-                    .border_type(widgets::BorderType::Plain),
-                    );
+            let header = generate_page_section!("TODO LIST");
+            let empty_left = generate_page_section!();
+            let empty_right = generate_page_section!();
+            let command_buffer = match buffer{
+                BufferType::Error(_) =>{
+                    let color = Color::Red;
+                    generate_page_section!(command_contents, color) 
+                },
+                _ => generate_page_section!(command_contents),
+            };
 
             rec.render_widget(header, chunks[0]);
             rec.render_widget(empty_left, content[0]);
-           
+
             rec.render_widget(indexes, todo_content[0]);
             rec.render_widget(todos, todo_content[1]);
             rec.render_widget(completions, todo_content[2]);
@@ -146,54 +168,16 @@ pub fn render_adding(
                     .as_ref(),
                     )
                 .split(size);
-
-            let header = widgets::Paragraph::new("TODO LIST")
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(Style::default().fg(Color::White))
-                    .border_type(widgets::BorderType::Plain),
-                    );
-
-            let empty_left = widgets::Paragraph::new("")
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Left)
-                .block(
-                    widgets::Block::default()
-                    .style(Style::default().fg(Color::White))
-                    .border_type(widgets::BorderType::Plain),
-                    );
+            
+            
+            let header = generate_page_section!("TODO LIST");
+            let empty_left = generate_page_section!();
+            let color = Color::LightGreen;
+            let new_todo = generate_page_section!(todo_string, "AddingTask", color);
+            let command_buffer = generate_page_section!("AddingTask");
 
             let (content, todo_content, indexes, todos, completions) =   
                 generate_content(&chunks, todo_items).unwrap();
-
-            let new_todo = widgets::Paragraph::new(todo_string)
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Left)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(Style::default().fg(Color::LightGreen))
-                    .title("New Task")
-                    .border_type(widgets::BorderType::Thick),
-                    );
-
-            let command_buffer = widgets::Paragraph::new("Adding Task")
-                .style(
-                    Style::default()
-                    .fg(Color::LightCyan)
-                    .add_modifier(Modifier::BOLD),
-                    )
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                    .borders(widgets::Borders::ALL)
-                    .style(Style::default().fg(Color::White))
-                    .title("Commands")
-                    .border_type(widgets::BorderType::Plain),
-                    );
 
             rec.render_widget(header, chunks[0]);
             rec.render_widget(empty_left, content[0]);
@@ -242,56 +226,16 @@ pub fn render_adding_date(
                 )
                 .split(size);
 
-            let header = widgets::Paragraph::new("TODO LIST")
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                        .borders(widgets::Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .border_type(widgets::BorderType::Plain),
-                );
-
+            let header = generate_page_section!("TODO LIST");
+            let empty_left = generate_page_section!();
+            let color = Color::LightGreen;
+            let new_todo = generate_page_section!(todo_string, "AddingTask", color);
+            let command_buffer = generate_page_section!("AddingTask");
 
             let (content, todo_content, indexes, todos, completions) =   
                 generate_content(&chunks, todo_items).unwrap();
             
-            let empty_left = widgets::Paragraph::new("")
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Left)
-                .block(
-                    widgets::Block::default()
-                    .style(Style::default().fg(Color::White))
-                    .border_type(widgets::BorderType::Plain),
-                    );
-
-            let new_todo = widgets::Paragraph::new(todo_string)
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(layout::Alignment::Left)
-                .block(
-                    widgets::Block::default()
-                        .borders(widgets::Borders::ALL)
-                        .style(Style::default().fg(Color::LightGreen))
-                        .title("New Task With Date")
-                        .border_type(widgets::BorderType::Thick),
-                );
-
-            let command_buffer = widgets::Paragraph::new("Adding Task")
-                .style(
-                    Style::default()
-                        .fg(Color::LightCyan)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .alignment(layout::Alignment::Center)
-                .block(
-                    widgets::Block::default()
-                        .borders(widgets::Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .title("Commands")
-                        .border_type(widgets::BorderType::Plain),
-                );
-            
-            //header area
+           //header area
             rec.render_widget(header, chunks[0]);
 
             //center area

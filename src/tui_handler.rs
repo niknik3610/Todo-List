@@ -376,6 +376,15 @@ pub mod tui_handler {
                 )?;
                 return Ok(());
             }
+            NotFound => {
+                render::render_main(
+                    terminal,
+                    render::BufferType::Error("Invalid Command"),
+                    todo_items,
+                    )?;
+                return Ok(());
+
+            }
             _ => return Err(e),
         }
     }
